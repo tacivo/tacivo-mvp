@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import jsPDF from 'jspdf';
@@ -36,7 +36,7 @@ type Context = {
 
 type Step = 'initial' | 'context' | 'chat' | 'results';
 
-export default function InterviewPage() {
+function InterviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('initial');
@@ -1161,5 +1161,20 @@ export default function InterviewPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function InterviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-book-cloth/30 border-t-book-cloth rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading interview...</p>
+        </div>
+      </div>
+    }>
+      <InterviewPageContent />
+    </Suspense>
   );
 }
