@@ -66,18 +66,30 @@ This MVP enables organizations to capture expert knowledge through AI-conducted 
    ```
 
    Edit `.env.local` and add your API keys:
-   ```
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+   ```env
+   ANTHROPIC_API_KEY=your_key_here
+   ELEVENLABS_API_KEY=your_key_here
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_key
    ```
 
-4. **Run the development server**
+4. **Set up Supabase database**
+
+   See [docs/01-SUPABASE_SETUP.md](docs/01-SUPABASE_SETUP.md) for complete instructions.
+
+   Quick start:
+   - Create a Supabase project
+   - Go to SQL Editor
+   - Run `supabase/migrations/001_initial_schema.sql`
+
+5. **Run the development server**
    ```bash
    npm run dev
    ```
 
-5. **Open in browser**
-   Navigate to [http://localhost:3000/interview](http://localhost:3000/interview)
+6. **Open in browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## API Keys Setup
 
@@ -289,12 +301,25 @@ Proprietary - All rights reserved
 
 For questions or issues, contact [your-email@example.com]
 
+## Recent Updates
+
+### ✅ Completed Features
+- ✅ Database integration with Supabase (PostgreSQL)
+- ✅ Multi-user authentication with secure signup/login
+- ✅ Interview storage and replay functionality
+- ✅ User dashboard with statistics
+- ✅ Document history and management
+- ✅ Resume in-progress interviews
+- ✅ Export documents as Markdown or PDF
+
+See the [docs/](docs/) folder for detailed documentation on all features.
+
 ## Roadmap
 
 Future enhancements:
-- Database integration for interview storage
-- Multi-user authentication
-- Interview replay and editing
 - Custom document templates
+- Team collaboration features
 - API rate limiting
 - Analytics dashboard
+- File upload to Supabase Storage
+- Document editing
