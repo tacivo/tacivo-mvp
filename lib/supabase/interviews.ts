@@ -1,0 +1,252 @@
+import { supabase } from './client'
+import {
+  InsertInterview,
+  InsertInterviewMessage,
+  InsertDocument,
+  InterviewWithMessages,
+  Interview,
+  InterviewMessage,
+  Document
+} from '@/types/database.types'
+
+/**
+ * Create a new interview
+ */
+export async function createInterview(data: InsertInterview) {
+  const { data: interview, error } = await supabase
+    .from('interviews')
+    .insert(data as any)
+    .select()
+    .single()
+
+  if (error) throw error
+  return interview as Interview
+}
+
+/**
+ * Get interview by ID
+ */
+export async function getInterview(interviewId: string) {
+  const { data, error } = await supabase
+    .from('interviews')
+    .select('*')
+    .eq('id', interviewId)
+    .single()
+
+  if (error) throw error
+  return data as Interview
+}
+
+/**
+ * Get interview with all messages and profile
+ */
+export async function getInterviewWithMessages(interviewId: string): Promise<InterviewWithMessages> {
+  const { data: interview, error: interviewError } = await supabase
+    .from('interviews')
+    .select(`
+      *,
+      profile:profiles(*)
+    `)
+    .eq('id', interviewId)
+    .single()
+
+  if (interviewError) throw interviewError
+
+  const { data: messages, error: messagesError } = await supabase
+    .from('interview_messages')
+    .select('*')
+    .eq('interview_id', interviewId)
+    .order('sequence_number', { ascending: true })
+
+  if (messagesError) throw messagesError
+
+  return {
+    ...(interview as any),
+    messages: messages || [],
+    profile: (interview as any).profile
+  } as InterviewWithMessages
+}
+
+/**
+ * Get all interviews for current user
+ */
+export async function getUserInterviews() {
+  const { data, error } = await supabase
+    .from('interviews')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data || []) as Interview[]
+}
+
+/**
+ * Update interview status
+ */
+export async function updateInterviewStatus(
+  interviewId: string,
+  status: 'in_progress' | 'completed' | 'draft',
+  completedAt?: string
+) {
+  const updateData: Record<string, any> = {
+    status,
+    ...(completedAt ? { completed_at: completedAt } : {})
+  }
+
+  const { data, error } = await supabase
+    .from('interviews')
+    // @ts-ignore - Supabase type inference issue with update
+    .update(updateData)
+    .eq('id', interviewId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Interview
+}
+
+/**
+ * Add message to interview
+ */
+export async function addInterviewMessage(data: InsertInterviewMessage) {
+  const { data: message, error } = await supabase
+    .from('interview_messages')
+    .insert(data as any)
+    .select()
+    .single()
+
+  if (error) throw error
+  return message as InterviewMessage
+}
+
+/**
+ * Add multiple messages to interview (batch)
+ */
+export async function addInterviewMessages(messages: InsertInterviewMessage[]) {
+  const { data, error } = await supabase
+    .from('interview_messages')
+    .insert(messages as any)
+    .select()
+
+  if (error) throw error
+  return data as InterviewMessage[]
+}
+
+/**
+ * Get interview messages
+ */
+export async function getInterviewMessages(interviewId: string) {
+  const { data, error } = await supabase
+    .from('interview_messages')
+    .select('*')
+    .eq('interview_id', interviewId)
+    .order('sequence_number', { ascending: true })
+
+  if (error) throw error
+  return (data || []) as InterviewMessage[]
+}
+
+/**
+ * Create document
+ */
+export async function createDocument(data: InsertDocument) {
+  const { data: document, error } = await supabase
+    .from('documents')
+    .insert(data as any)
+    .select()
+    .single()
+
+  if (error) throw error
+  return document as Document
+}
+
+/**
+ * Get document by interview ID
+ */
+export async function getDocumentByInterviewId(interviewId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('interview_id', interviewId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null // No rows returned
+    throw error
+  }
+  return data as Document
+}
+
+/**
+ * Get all documents for current user
+ */
+export async function getUserDocuments() {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data || []) as Document[]
+}
+
+/**
+ * Update document
+ */
+export async function updateDocument(documentId: string, content: string) {
+  const updateData: Record<string, any> = {
+    content,
+    updated_at: new Date().toISOString()
+  }
+
+  const { data, error } = await supabase
+    .from('documents')
+    // @ts-ignore - Supabase type inference issue with update
+    .update(updateData)
+    .eq('id', documentId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Document
+}
+
+/**
+ * Delete interview (cascades to messages and documents)
+ */
+export async function deleteInterview(interviewId: string) {
+  const { error } = await supabase
+    .from('interviews')
+    .delete()
+    .eq('id', interviewId)
+
+  if (error) throw error
+}
+
+/**
+ * Get user statistics
+ */
+export async function getUserStats() {
+  const { data: interviews, error: interviewsError } = await supabase
+    .from('interviews')
+    .select('id, status')
+
+  if (interviewsError) throw interviewsError
+
+  const { data: documents, error: documentsError } = await supabase
+    .from('documents')
+    .select('id')
+
+  if (documentsError) throw documentsError
+
+  const completedInterviews = interviews?.filter((i: any) => i.status === 'completed').length || 0
+  const totalInterviews = interviews?.length || 0
+  const totalDocuments = documents?.length || 0
+
+  return {
+    totalInterviews,
+    completedInterviews,
+    totalDocuments,
+    hoursEstimated: completedInterviews * 0.5 // Rough estimate: 30 min per interview
+  }
+}

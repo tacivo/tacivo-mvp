@@ -1,11 +1,10 @@
 import { NextRequest } from 'next/server';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 
-const elevenlabs = new ElevenLabsClient({
-  apiKey: process.env.ELEVENLABS_API_KEY,
-});
-
 export async function POST(req: NextRequest) {
+  const elevenlabs = new ElevenLabsClient({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+  });
   try {
     const formData = await req.formData();
     const audioFile = formData.get('audio') as File;
