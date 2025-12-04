@@ -118,6 +118,7 @@ export interface Database {
           document_type: 'case-study' | 'best-practices'
           format: 'markdown' | 'pdf'
           file_url: string | null
+          is_shared: boolean
           created_at: string
           updated_at: string
         }
@@ -130,6 +131,7 @@ export interface Database {
           document_type: 'case-study' | 'best-practices'
           format?: 'markdown' | 'pdf'
           file_url?: string | null
+          is_shared?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -142,6 +144,7 @@ export interface Database {
           document_type?: 'case-study' | 'best-practices'
           format?: 'markdown' | 'pdf'
           file_url?: string | null
+          is_shared?: boolean
           created_at?: string
           updated_at?: string
         }

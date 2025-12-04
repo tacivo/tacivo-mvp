@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Copy, Check, Share2 } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
@@ -19,6 +19,11 @@ export default function DocumentViewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedContent, setEditedContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadDocument();
@@ -31,6 +36,8 @@ export default function DocumentViewPage() {
         router.push('/login');
         return;
       }
+
+      setCurrentUserId(user.id);
 
       const { data, error } = await supabase
         .from('documents')
@@ -139,6 +146,52 @@ export default function DocumentViewPage() {
     }
   };
 
+  const handleEditStart = () => {
+    if (!document) return;
+    setEditedTitle(document.title);
+    setEditedContent(document.content);
+    setIsEditing(true);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditedTitle('');
+    setEditedContent('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!document) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await (supabase
+        .from('documents')
+        .update as any)({
+          title: editedTitle,
+          content: editedContent,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', document.id);
+
+      if (error) throw error;
+
+      // Update local document state
+      setDocument({
+        ...document,
+        title: editedTitle,
+        content: editedContent
+      });
+
+      setIsEditing(false);
+      alert('Document updated successfully!');
+    } catch (error) {
+      console.error('Error updating document:', error);
+      alert('Failed to update document');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -166,6 +219,8 @@ export default function DocumentViewPage() {
     );
   }
 
+  const isOwner = currentUserId === (document as any).user_id;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -181,49 +236,84 @@ export default function DocumentViewPage() {
             </button>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleShareToggle}
-                disabled={isSharing}
-                className={`px-4 py-2 text-sm font-medium border rounded-lg transition-all flex items-center gap-2 ${
-                  (document as any).is_shared
-                    ? 'border-book-cloth text-book-cloth bg-book-cloth/5 hover:bg-book-cloth/10'
-                    : 'border-border text-foreground hover:bg-slate-50'
-                }`}
-                title={(document as any).is_shared ? 'Shared with company' : 'Share with company'}
-              >
-                <Share2 className="w-4 h-4" />
-                {isSharing ? 'Updating...' : (document as any).is_shared ? 'Shared' : 'Share'}
-              </button>
-              <button
-                onClick={copyToClipboard}
-                className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    Copy
-                  </>
-                )}
-              </button>
-              <button
-                onClick={downloadMarkdown}
-                className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Markdown
-              </button>
-              <button
-                onClick={downloadPDF}
-                className="px-4 py-2 text-sm font-medium bg-book-cloth text-white rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                PDF
-              </button>
+              {isOwner && !isEditing && (
+                <>
+                  <button
+                    onClick={handleEditStart}
+                    className="px-4 py-2 text-sm font-medium border border-border text-foreground rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleShareToggle}
+                    disabled={isSharing}
+                    className={`px-4 py-2 text-sm font-medium border rounded-lg transition-all flex items-center gap-2 ${
+                      (document as any).is_shared
+                        ? 'border-book-cloth text-book-cloth bg-book-cloth/5 hover:bg-book-cloth/10'
+                        : 'border-border text-foreground hover:bg-slate-50'
+                    }`}
+                    title={(document as any).is_shared ? 'Shared with company' : 'Share with company'}
+                  >
+                    <Share2 className="w-4 h-4" />
+                    {isSharing ? 'Updating...' : (document as any).is_shared ? 'Shared' : 'Share'}
+                  </button>
+                </>
+              )}
+              {isOwner && isEditing && (
+                <>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium bg-book-cloth text-white rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleEditCancel}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium border border-border text-foreground rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                </>
+              )}
+              {!isEditing && (
+                <>
+                  <button
+                    onClick={copyToClipboard}
+                    className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={downloadMarkdown}
+                    className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Markdown
+                  </button>
+                  <button
+                    onClick={downloadPDF}
+                    className="px-4 py-2 text-sm font-medium bg-book-cloth text-white rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    PDF
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -238,9 +328,19 @@ export default function DocumentViewPage() {
         >
           {/* Document Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-foreground mb-2">
-              {document.title}
-            </h1>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                className="w-full text-3xl font-semibold text-foreground mb-2 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-book-cloth"
+                placeholder="Document title"
+              />
+            ) : (
+              <h1 className="text-3xl font-semibold text-foreground mb-2">
+                {document.title}
+              </h1>
+            )}
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="px-3 py-1 rounded-full bg-book-cloth/10 text-book-cloth font-medium">
                 {document.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
@@ -257,9 +357,18 @@ export default function DocumentViewPage() {
 
           {/* Document Content */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-8">
-            <div className="prose prose-slate max-w-none">
-              <ReactMarkdown>{document.content}</ReactMarkdown>
-            </div>
+            {isEditing ? (
+              <textarea
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
+                className="w-full min-h-[500px] px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-book-cloth font-mono text-sm"
+                placeholder="Document content (Markdown format)"
+              />
+            ) : (
+              <div className="prose prose-slate max-w-none">
+                <ReactMarkdown>{document.content}</ReactMarkdown>
+              </div>
+            )}
           </div>
         </motion.div>
       </main>
