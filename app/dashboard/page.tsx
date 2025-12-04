@@ -247,10 +247,15 @@ export default function DashboardPage() {
                               <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
                                 {interview.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
                               </span>
+                              {interview.function_area && (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-kraft/20 text-slate-700">
+                                  {interview.function_area}
+                                </span>
+                              )}
                             </div>
 
                             <h3 className="font-medium text-foreground group-hover:text-book-cloth transition-colors mb-1">
-                              {interview.description}
+                              {interview.title || interview.description}
                             </h3>
 
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">

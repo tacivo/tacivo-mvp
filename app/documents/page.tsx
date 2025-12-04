@@ -324,10 +324,15 @@ function DocumentsPageContent() {
                             <span className="px-3 py-1 rounded-full bg-book-cloth/10 text-book-cloth text-xs font-medium">
                               {interview.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
                             </span>
+                            {interview.function_area && (
+                              <span className="px-3 py-1 rounded-full bg-kraft/20 text-slate-700 text-xs font-medium">
+                                {interview.function_area}
+                              </span>
+                            )}
                           </div>
 
                           <h3 className="text-lg font-semibold text-foreground mb-2">
-                            {interview.description}
+                            {interview.title || interview.description}
                           </h3>
 
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">

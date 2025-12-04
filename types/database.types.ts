@@ -46,6 +46,8 @@ export interface Database {
           id: string
           user_id: string
           document_type: 'case-study' | 'best-practices'
+          title: string | null
+          function_area: string | null
           description: string
           status: 'in_progress' | 'completed' | 'draft'
           started_at: string
@@ -57,6 +59,8 @@ export interface Database {
           id?: string
           user_id: string
           document_type: 'case-study' | 'best-practices'
+          title?: string | null
+          function_area?: string | null
           description: string
           status?: 'in_progress' | 'completed' | 'draft'
           started_at?: string
@@ -68,6 +72,8 @@ export interface Database {
           id?: string
           user_id?: string
           document_type?: 'case-study' | 'best-practices'
+          title?: string | null
+          function_area?: string | null
           description?: string
           status?: 'in_progress' | 'completed' | 'draft'
           started_at?: string

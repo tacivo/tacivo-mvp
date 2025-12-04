@@ -30,6 +30,8 @@ type Context = {
   role: string;
   yearsOfExperience: string;
   documentType: DocumentType;
+  title: string;
+  functionArea: string;
   description: string;
   uploadedFiles: File[];
 };
@@ -46,6 +48,8 @@ function InterviewPageContent() {
     role: '',
     yearsOfExperience: '',
     documentType: null,
+    title: '',
+    functionArea: '',
     description: '',
     uploadedFiles: [],
   });
@@ -241,6 +245,8 @@ function InterviewPageContent() {
       const interview = await createInterview({
         user_id: currentUserId,
         document_type: context.documentType!,
+        title: context.title,
+        function_area: context.functionArea,
         description: context.description,
         status: 'in_progress'
       });
@@ -489,7 +495,7 @@ function InterviewPageContent() {
           await createDocument({
             interview_id: currentInterviewId,
             user_id: currentUserId,
-            title: `${context.documentType === 'case-study' ? 'Case Study' : 'Best Practices Guide'} - ${context.expertName}`,
+            title: context.title || `${context.documentType === 'case-study' ? 'Case Study' : 'Best Practices Guide'} - ${context.expertName}`,
             content: data.document,
             document_type: context.documentType!,
             format: 'markdown'
@@ -559,6 +565,8 @@ function InterviewPageContent() {
       role: '',
       yearsOfExperience: '',
       documentType: null,
+      title: '',
+      functionArea: '',
       description: '',
       uploadedFiles: [],
     });
@@ -753,6 +761,38 @@ function InterviewPageContent() {
               </div>
 
               <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/60 shadow-lg space-y-6">
+                {/* Title Section */}
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground mb-2">
+                    Title
+                  </h2>
+                  <input
+                    type="text"
+                    value={context.title}
+                    onChange={(e) => setContext({ ...context, title: e.target.value })}
+                    className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-book-cloth focus:border-transparent outline-none transition bg-background"
+                    placeholder={
+                      context.documentType === 'case-study'
+                        ? 'e.g., Enterprise XYZ - $500K Deal Closure'
+                        : 'e.g., Enterprise Sales Playbook'
+                    }
+                  />
+                </div>
+
+                {/* Function/Area Section */}
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground mb-2">
+                    Function / Area of Application
+                  </h2>
+                  <input
+                    type="text"
+                    value={context.functionArea}
+                    onChange={(e) => setContext({ ...context, functionArea: e.target.value })}
+                    className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-book-cloth focus:border-transparent outline-none transition bg-background"
+                    placeholder="e.g., Sales, Marketing, Engineering, Customer Success"
+                  />
+                </div>
+
                 {/* Description Section */}
                 <div>
                   <h2 className="text-lg font-semibold text-foreground mb-2">
@@ -766,7 +806,7 @@ function InterviewPageContent() {
                   <textarea
                     value={context.description}
                     onChange={(e) => setContext({ ...context, description: e.target.value })}
-                    rows={4}
+                    rows={3}
                     className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-book-cloth focus:border-transparent outline-none transition resize-none bg-background"
                     placeholder={
                       context.documentType === 'case-study'
@@ -786,31 +826,30 @@ function InterviewPageContent() {
                   <h2 className="text-lg font-semibold text-foreground mb-2">
                     Upload documents (optional)
                   </h2>
-                  <p className="text-sm text-slate-500 mb-4">
+                  <p className="text-sm text-slate-500 mb-3">
                     {context.documentType === 'case-study'
-                      ? 'Upload anything related to this specific project: proposals, reports, presentations, emails, notes. This helps us ask more informed questions.'
-                      : "Upload any existing materials you have: past presentations, reports, templates, procedures. We'll use these as a foundation to build on."}
+                      ? 'Upload anything related to this specific project.'
+                      : 'Upload any existing materials you have.'}
                   </p>
 
-                  {/* Drop Zone */}
+                  {/* Drop Zone - Smaller */}
                   <div
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
                       isDragging
                         ? 'border-book-cloth bg-book-cloth/5'
                         : 'border-border hover:border-book-cloth/50 hover:bg-secondary'
                     }`}
                   >
-                    <Upload className="w-10 h-10 mx-auto mb-3 text-gray-400" />
-                    <p className="text-slate-700 font-medium mb-2">
-                      Drag and drop files here
+                    <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm text-slate-700 font-medium mb-1">
+                      Drag and drop files or click to browse
                     </p>
-                    <p className="text-sm text-slate-500 mb-4">or click to browse</p>
                     <p className="text-xs text-slate-400">
-                      PDF, DOCX, PPTX, TXT, MD (Max 10MB per file)
+                      PDF, DOCX, PPTX, TXT, MD (Max 10MB)
                     </p>
                   </div>
 
