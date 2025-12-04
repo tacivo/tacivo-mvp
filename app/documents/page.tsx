@@ -1,23 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, FileText, Clock, CheckCircle, Eye, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Clock, CheckCircle, Eye, Trash2, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { getUserInterviews, getUserDocuments, deleteInterview } from '@/lib/supabase/interviews';
+import { getUserInterviews, getUserDocuments, deleteInterview, getSharedCompanyDocuments } from '@/lib/supabase/interviews';
 import { Interview, Document } from '@/types/database.types';
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSharedView = searchParams.get('shared') === 'true';
+
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [sharedDocuments, setSharedDocuments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'in-progress' | 'completed'>('all');
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isSharedView]);
 
   async function loadData() {
     try {
@@ -27,13 +31,20 @@ export default function DocumentsPage() {
         return;
       }
 
-      const [interviewsData, documentsData] = await Promise.all([
-        getUserInterviews(),
-        getUserDocuments()
-      ]);
+      if (isSharedView) {
+        // Load only shared documents
+        const sharedDocsData = await getSharedCompanyDocuments();
+        setSharedDocuments(sharedDocsData);
+      } else {
+        // Load user's own interviews and documents
+        const [interviewsData, documentsData] = await Promise.all([
+          getUserInterviews(),
+          getUserDocuments()
+        ]);
 
-      setInterviews(interviewsData);
-      setDocuments(documentsData);
+        setInterviews(interviewsData);
+        setDocuments(documentsData);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -110,7 +121,14 @@ export default function DocumentsPage() {
                 Dashboard
               </button>
               <div className="h-8 w-px bg-border"></div>
-              <h1 className="text-xl font-semibold text-foreground">Your Interviews</h1>
+              {isSharedView ? (
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-book-cloth" />
+                  <h1 className="text-xl font-semibold text-foreground">Collective Knowledge</h1>
+                </div>
+              ) : (
+                <h1 className="text-xl font-semibold text-foreground">Your Interviews</h1>
+              )}
             </div>
           </div>
         </div>
@@ -123,155 +141,235 @@ export default function DocumentsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          {/* Tabs */}
-          <div className="flex gap-4 mb-8 border-b border-border">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`pb-3 px-4 text-sm font-medium transition-colors relative ${
-                activeTab === 'all'
-                  ? 'text-book-cloth'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              All Interviews
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-xs">
-                {interviews.length}
-              </span>
-              {activeTab === 'all' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-book-cloth"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('in-progress')}
-              className={`pb-3 px-4 text-sm font-medium transition-colors relative ${
-                activeTab === 'in-progress'
-                  ? 'text-book-cloth'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              In Progress
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-orange-100 text-xs text-orange-700">
-                {interviews.filter(i => i.status === 'in_progress').length}
-              </span>
-              {activeTab === 'in-progress' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-book-cloth"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`pb-3 px-4 text-sm font-medium transition-colors relative ${
-                activeTab === 'completed'
-                  ? 'text-book-cloth'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Completed
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-xs text-green-700">
-                {interviews.filter(i => i.status === 'completed').length}
-              </span>
-              {activeTab === 'completed' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-book-cloth"></div>
-              )}
-            </button>
-          </div>
-
-          {/* Interviews List */}
-          {filteredInterviews.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                No interviews yet
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Start your first interview to capture your expertise
-              </p>
+          {/* Show tabs only for user's own interviews */}
+          {!isSharedView && (
+            <div className="flex gap-4 mb-8 border-b border-border">
               <button
-                onClick={() => router.push('/interview')}
-                className="px-6 py-3 bg-book-cloth text-white font-medium rounded-lg hover:bg-book-cloth/90 transition-all"
+                onClick={() => setActiveTab('all')}
+                className={`pb-3 px-4 text-sm font-medium transition-colors relative ${
+                  activeTab === 'all'
+                    ? 'text-book-cloth'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
-                Start Interview
+                All Interviews
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-xs">
+                  {interviews.length}
+                </span>
+                {activeTab === 'all' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-book-cloth"></div>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('in-progress')}
+                className={`pb-3 px-4 text-sm font-medium transition-colors relative ${
+                  activeTab === 'in-progress'
+                    ? 'text-book-cloth'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                In Progress
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-orange-100 text-xs text-orange-700">
+                  {interviews.filter(i => i.status === 'in_progress').length}
+                </span>
+                {activeTab === 'in-progress' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-book-cloth"></div>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`pb-3 px-4 text-sm font-medium transition-colors relative ${
+                  activeTab === 'completed'
+                    ? 'text-book-cloth'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Completed
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-xs text-green-700">
+                  {interviews.filter(i => i.status === 'completed').length}
+                </span>
+                {activeTab === 'completed' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-book-cloth"></div>
+                )}
               </button>
             </div>
-          ) : (
-            <div className="grid gap-4">
-              {filteredInterviews.map((interview) => {
-                const document = documents.find(d => d.interview_id === interview.id);
+          )}
 
-                return (
-                  <motion.div
-                    key={interview.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-xl border border-border p-6 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                            interview.status === 'completed'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            {interview.status === 'completed' ? (
-                              <>
-                                <CheckCircle className="w-3 h-3" />
-                                Completed
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="w-3 h-3" />
-                                In Progress
-                              </>
-                            )}
-                          </span>
-                          <span className="px-3 py-1 rounded-full bg-book-cloth/10 text-book-cloth text-xs font-medium">
-                            {interview.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                          </span>
+          {/* Interviews List or Shared Documents */}
+          {isSharedView ? (
+            // Shared Documents View
+            sharedDocuments.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  No shared knowledge yet
+                </h3>
+                <p className="text-muted-foreground">
+                  When your colleagues share their knowledge, it will appear here
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {sharedDocuments.map((doc) => {
+                  const profile = doc.profiles;
+                  const getColorFromName = (name: string) => {
+                    const colors = [
+                      'from-book-cloth to-book-cloth/80',
+                      'from-kraft to-kraft/80',
+                      'from-slate-600 to-slate-700',
+                      'from-book-cloth/70 to-kraft',
+                      'from-slate-500 to-slate-600',
+                    ];
+                    const charCode = name.charCodeAt(0);
+                    return colors[charCode % colors.length];
+                  };
+
+                  return (
+                    <motion.div
+                      key={doc.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white rounded-xl border border-border p-6 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getColorFromName(profile?.full_name || 'Unknown')} flex items-center justify-center text-white font-semibold flex-shrink-0`}>
+                              {(profile?.full_name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{profile?.full_name || 'Unknown'}</p>
+                              <p className="text-sm text-muted-foreground">{profile?.role || 'Expert'}</p>
+                            </div>
+                          </div>
+
+                          <div className="mb-2">
+                            <span className="px-3 py-1 rounded-full bg-book-cloth/10 text-book-cloth text-xs font-medium">
+                              {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                            {doc.title || doc.description || 'Untitled Document'}
+                          </h3>
+
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>Shared {formatDate(doc.created_at)}</span>
+                          </div>
                         </div>
-
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          {interview.description}
-                        </h3>
-
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span>Started {formatDate(interview.created_at)}</span>
-                          {interview.completed_at && (
-                            <span>• Completed {formatDate(interview.completed_at)}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {interview.status === 'in_progress' ? (
-                          <button
-                            onClick={() => handleResumeInterview(interview.id)}
-                            className="px-4 py-2 bg-book-cloth text-white text-sm font-medium rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
-                          >
-                            Resume
-                          </button>
-                        ) : document ? (
-                          <button
-                            onClick={() => handleViewDocument(document.id)}
-                            className="px-4 py-2 bg-book-cloth text-white text-sm font-medium rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
-                          >
-                            <Eye className="w-4 h-4" />
-                            View Document
-                          </button>
-                        ) : null}
 
                         <button
-                          onClick={() => handleDeleteInterview(interview.id)}
-                          className="p-2 text-muted-foreground hover:text-red-600 transition-colors"
-                          title="Delete interview"
+                          onClick={() => handleViewDocument(doc.id)}
+                          className="px-4 py-2 bg-book-cloth text-white text-sm font-medium rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Eye className="w-4 h-4" />
+                          View
                         </button>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            // User's Own Interviews View
+            filteredInterviews.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  No interviews yet
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Start your first interview to capture your expertise
+                </p>
+                <button
+                  onClick={() => router.push('/interview')}
+                  className="px-6 py-3 bg-book-cloth text-white font-medium rounded-lg hover:bg-book-cloth/90 transition-all"
+                >
+                  Start Interview
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredInterviews.map((interview) => {
+                  const document = documents.find(d => d.interview_id === interview.id);
+
+                  return (
+                    <motion.div
+                      key={interview.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white rounded-xl border border-border p-6 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                              interview.status === 'completed'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              {interview.status === 'completed' ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3" />
+                                  Completed
+                                </>
+                              ) : (
+                                <>
+                                  <Clock className="w-3 h-3" />
+                                  In Progress
+                                </>
+                              )}
+                            </span>
+                            <span className="px-3 py-1 rounded-full bg-book-cloth/10 text-book-cloth text-xs font-medium">
+                              {interview.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                            {interview.description}
+                          </h3>
+
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>Started {formatDate(interview.created_at)}</span>
+                            {interview.completed_at && (
+                              <span>• Completed {formatDate(interview.completed_at)}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {interview.status === 'in_progress' ? (
+                            <button
+                              onClick={() => handleResumeInterview(interview.id)}
+                              className="px-4 py-2 bg-book-cloth text-white text-sm font-medium rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
+                            >
+                              Resume
+                            </button>
+                          ) : document ? (
+                            <button
+                              onClick={() => handleViewDocument(document.id)}
+                              className="px-4 py-2 bg-book-cloth text-white text-sm font-medium rounded-lg hover:bg-book-cloth/90 transition-all flex items-center gap-2"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View Document
+                            </button>
+                          ) : null}
+
+                          <button
+                            onClick={() => handleDeleteInterview(interview.id)}
+                            className="p-2 text-muted-foreground hover:text-red-600 transition-colors"
+                            title="Delete interview"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )
           )}
         </motion.div>
       </main>

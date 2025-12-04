@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Check, Share2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
+import { shareDocument, unshareDocument } from '@/lib/supabase/interviews';
 import { Document } from '@/types/database.types';
 
 export default function DocumentViewPage() {
@@ -17,6 +18,7 @@ export default function DocumentViewPage() {
   const [document, setDocument] = useState<Document | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     loadDocument();
@@ -115,6 +117,28 @@ export default function DocumentViewPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleShareToggle = async () => {
+    if (!document) return;
+
+    setIsSharing(true);
+    try {
+      if ((document as any).is_shared) {
+        await unshareDocument(document.id);
+        alert('Document is now private');
+      } else {
+        await shareDocument(document.id);
+        alert('Document shared with your company!');
+      }
+      // Reload document to get updated is_shared status
+      await loadDocument();
+    } catch (error) {
+      console.error('Error toggling share:', error);
+      alert('Failed to update sharing status');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -149,14 +173,27 @@ export default function DocumentViewPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 lg:h-20">
             <button
-              onClick={() => router.push('/documents')}
+              onClick={() => router.push('/dashboard')}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Interviews
+              Back to Dashboard
             </button>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleShareToggle}
+                disabled={isSharing}
+                className={`px-4 py-2 text-sm font-medium border rounded-lg transition-all flex items-center gap-2 ${
+                  (document as any).is_shared
+                    ? 'border-book-cloth text-book-cloth bg-book-cloth/5 hover:bg-book-cloth/10'
+                    : 'border-border text-foreground hover:bg-slate-50'
+                }`}
+                title={(document as any).is_shared ? 'Shared with company' : 'Share with company'}
+              >
+                <Share2 className="w-4 h-4" />
+                {isSharing ? 'Updating...' : (document as any).is_shared ? 'Shared' : 'Share'}
+              </button>
               <button
                 onClick={copyToClipboard}
                 className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"

@@ -250,3 +250,57 @@ export async function getUserStats() {
     hoursEstimated: completedInterviews * 0.5 // Rough estimate: 30 min per interview
   }
 }
+
+/**
+ * Share document with company
+ */
+export async function shareDocument(documentId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    // @ts-ignore - Supabase type inference issue with update
+    .update({ is_shared: true, updated_at: new Date().toISOString() })
+    .eq('id', documentId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Document
+}
+
+/**
+ * Unshare document (make it private again)
+ */
+export async function unshareDocument(documentId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    // @ts-ignore - Supabase type inference issue with update
+    .update({ is_shared: false, updated_at: new Date().toISOString() })
+    .eq('id', documentId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Document
+}
+
+/**
+ * Get shared documents from company
+ */
+export async function getSharedCompanyDocuments() {
+  const { data, error } = await supabase
+    .from('documents')
+    .select(`
+      *,
+      profiles:user_id (
+        id,
+        full_name,
+        role,
+        company
+      )
+    `)
+    .eq('is_shared', true)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data || []) as any[]
+}
