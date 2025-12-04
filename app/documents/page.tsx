@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, FileText, Clock, CheckCircle, Eye, Trash2, Users } from 'lucide-react';
@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase/client';
 import { getUserInterviews, getUserDocuments, deleteInterview, getSharedCompanyDocuments } from '@/lib/supabase/interviews';
 import { Interview, Document } from '@/types/database.types';
 
-export default function DocumentsPage() {
+function DocumentsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isSharedView = searchParams.get('shared') === 'true';
@@ -374,5 +374,20 @@ export default function DocumentsPage() {
         </motion.div>
       </main>
     </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-book-cloth border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <DocumentsPageContent />
+    </Suspense>
   );
 }
