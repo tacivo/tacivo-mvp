@@ -608,7 +608,7 @@ function InterviewPageContent() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 lg:h-20">
             <div className="flex items-center w-[140px]">
-              <img src="/assets/logo/svg/13.svg" alt="Tacivo" className="h-20" />
+              <img src="/assets/logo/svg/10.svg" alt="Tacivo" className="h-20" />
             </div>
             <div className="flex items-center gap-4">
               {step === 'initial' && (
