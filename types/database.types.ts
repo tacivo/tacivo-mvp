@@ -55,6 +55,7 @@ export interface Database {
           years_of_experience: number | null
           is_admin: boolean
           is_expert: boolean
+          is_super_admin: boolean
           goal: string | null
           area_of_expertise: string | null
           created_at: string
@@ -70,6 +71,7 @@ export interface Database {
           years_of_experience?: number | null
           is_admin?: boolean
           is_expert?: boolean
+          is_super_admin?: boolean
           goal?: string | null
           area_of_expertise?: string | null
           created_at?: string
@@ -85,6 +87,7 @@ export interface Database {
           years_of_experience?: number | null
           is_admin?: boolean
           is_expert?: boolean
+          is_super_admin?: boolean
           goal?: string | null
           area_of_expertise?: string | null
           created_at?: string
@@ -290,6 +293,44 @@ export interface Database {
           uploaded_at?: string
         }
       }
+      admin_invitations: {
+        Row: {
+          id: string
+          invited_by: string | null
+          email: string
+          full_name: string | null
+          token: string
+          status: 'pending' | 'accepted' | 'expired'
+          expires_at: string
+          accepted_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          invited_by?: string | null
+          email: string
+          full_name?: string | null
+          token?: string
+          status?: 'pending' | 'accepted' | 'expired'
+          expires_at: string
+          accepted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          invited_by?: string | null
+          email?: string
+          full_name?: string | null
+          token?: string
+          status?: 'pending' | 'accepted' | 'expired'
+          expires_at?: string
+          accepted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -307,6 +348,7 @@ export interface Database {
 export type Organization = Database['public']['Tables']['organizations']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Invitation = Database['public']['Tables']['invitations']['Row']
+export type AdminInvitation = Database['public']['Tables']['admin_invitations']['Row']
 export type Interview = Database['public']['Tables']['interviews']['Row']
 export type InterviewMessage = Database['public']['Tables']['interview_messages']['Row']
 export type Document = Database['public']['Tables']['documents']['Row']
@@ -314,6 +356,7 @@ export type UploadedFile = Database['public']['Tables']['uploaded_files']['Row']
 
 export type InsertOrganization = Database['public']['Tables']['organizations']['Insert']
 export type InsertInvitation = Database['public']['Tables']['invitations']['Insert']
+export type InsertAdminInvitation = Database['public']['Tables']['admin_invitations']['Insert']
 export type InsertInterview = Database['public']['Tables']['interviews']['Insert']
 export type InsertInterviewMessage = Database['public']['Tables']['interview_messages']['Insert']
 export type InsertDocument = Database['public']['Tables']['documents']['Insert']

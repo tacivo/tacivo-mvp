@@ -114,11 +114,11 @@ function DocumentsPageContent() {
           <div className="flex justify-between items-center h-16 lg:h-20">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/platform')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Dashboard
+                Platform
               </button>
               <div className="h-8 w-px bg-border"></div>
               {isSharedView ? (
