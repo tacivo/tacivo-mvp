@@ -93,9 +93,8 @@ export default function InvitationsPage() {
 
       const { data: invitationData, error } = await supabase
         .from('invitations')
-        // @ts-expect-error - Supabase type inference issue
         .insert({
-          organization_id: profile.organization_id,
+          organization_id: profile.organization_id!,
           invited_by: profile.id,
           email: newInvite.email,
           full_name: newInvite.full_name,
@@ -108,11 +107,11 @@ export default function InvitationsPage() {
           token: token,
           expires_at: expiresAt.toISOString(),
           status: 'pending'
-        })
+        } as any)
         .select()
-        .single()
+        .single() as { data: Invitation | null; error: any }
 
-      if (error) throw error
+      if (error || !invitationData) throw error || new Error('Failed to create invitation')
 
       // Send invitation email
       const emailResponse = await fetch('/api/invitations/send', {

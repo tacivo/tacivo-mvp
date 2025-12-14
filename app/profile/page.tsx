@@ -57,11 +57,11 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto px-6 lg:px-8">
           <div className="flex items-center h-16 lg:h-20">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/platform')}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
+              Back to Platform
             </button>
           </div>
         </div>
