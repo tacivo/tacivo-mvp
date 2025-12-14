@@ -304,3 +304,70 @@ export async function getSharedCompanyDocuments() {
   if (error) throw error
   return (data || []) as any[]
 }
+
+/**
+ * Get all experts in the organization with their shared document counts
+ */
+export async function getOrganizationExperts() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Get current user's organization
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError) {
+    // If error getting profile, just get all experts
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('is_expert', true)
+      .order('full_name', { ascending: true })
+
+    if (error) throw error
+    return (data || []) as any[]
+  }
+
+  const profileData = profile as { organization_id: string | null } | null
+
+  if (!profileData?.organization_id) {
+    // If no organization, just get all experts
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('is_expert', true)
+      .order('full_name', { ascending: true })
+
+    if (error) throw error
+    return (data || []) as any[]
+  }
+
+  // Get experts from the same organization
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('organization_id', profileData.organization_id)
+    .eq('is_expert', true)
+    .order('full_name', { ascending: true })
+
+  if (error) throw error
+  return (data || []) as any[]
+}
+
+/**
+ * Get shared documents by a specific expert
+ */
+export async function getExpertDocuments(expertId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('user_id', expertId)
+    .eq('is_shared', true)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data || []) as any[]
+}
