@@ -9,14 +9,54 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          website: string | null
+          logo_url: string | null
+          description: string | null
+          industry: string | null
+          size: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          website?: string | null
+          logo_url?: string | null
+          description?: string | null
+          industry?: string | null
+          size?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          website?: string | null
+          logo_url?: string | null
+          description?: string | null
+          industry?: string | null
+          size?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       profiles: {
         Row: {
           id: string
           email: string
           full_name: string | null
           company: string | null
+          organization_id: string | null
           role: string | null
           years_of_experience: number | null
+          is_admin: boolean
+          is_expert: boolean
+          goal: string | null
+          area_of_expertise: string | null
           created_at: string
           updated_at: string
         }
@@ -25,8 +65,13 @@ export interface Database {
           email: string
           full_name?: string | null
           company?: string | null
+          organization_id?: string | null
           role?: string | null
           years_of_experience?: number | null
+          is_admin?: boolean
+          is_expert?: boolean
+          goal?: string | null
+          area_of_expertise?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -35,8 +80,72 @@ export interface Database {
           email?: string
           full_name?: string | null
           company?: string | null
+          organization_id?: string | null
           role?: string | null
           years_of_experience?: number | null
+          is_admin?: boolean
+          is_expert?: boolean
+          goal?: string | null
+          area_of_expertise?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      invitations: {
+        Row: {
+          id: string
+          organization_id: string
+          invited_by: string
+          email: string
+          full_name: string
+          role: string | null
+          years_of_experience: number | null
+          area_of_expertise: string | null
+          goal: string | null
+          is_admin: boolean
+          is_expert: boolean
+          status: string
+          token: string
+          expires_at: string
+          accepted_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          invited_by: string
+          email: string
+          full_name: string
+          role?: string | null
+          years_of_experience?: number | null
+          area_of_expertise?: string | null
+          goal?: string | null
+          is_admin?: boolean
+          is_expert?: boolean
+          status?: string
+          token: string
+          expires_at: string
+          accepted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          invited_by?: string
+          email?: string
+          full_name?: string
+          role?: string | null
+          years_of_experience?: number | null
+          area_of_expertise?: string | null
+          goal?: string | null
+          is_admin?: boolean
+          is_expert?: boolean
+          status?: string
+          token?: string
+          expires_at?: string
+          accepted_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -195,17 +304,25 @@ export interface Database {
 }
 
 // Helper types for common operations
+export type Organization = Database['public']['Tables']['organizations']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
+export type Invitation = Database['public']['Tables']['invitations']['Row']
 export type Interview = Database['public']['Tables']['interviews']['Row']
 export type InterviewMessage = Database['public']['Tables']['interview_messages']['Row']
 export type Document = Database['public']['Tables']['documents']['Row']
 export type UploadedFile = Database['public']['Tables']['uploaded_files']['Row']
 
+export type InsertOrganization = Database['public']['Tables']['organizations']['Insert']
+export type InsertInvitation = Database['public']['Tables']['invitations']['Insert']
 export type InsertInterview = Database['public']['Tables']['interviews']['Insert']
 export type InsertInterviewMessage = Database['public']['Tables']['interview_messages']['Insert']
 export type InsertDocument = Database['public']['Tables']['documents']['Insert']
 
 // Extended types with relations
+export interface ProfileWithOrganization extends Profile {
+  organization: Organization | null
+}
+
 export interface InterviewWithProfile extends Interview {
   profile: Profile
 }
