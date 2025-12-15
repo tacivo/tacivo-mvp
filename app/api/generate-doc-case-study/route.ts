@@ -1,6 +1,97 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Markdown to BlockNote converter
+function markdownToBlockNote(markdown: string) {
+  const lines = markdown.split('\n');
+  const blocks: any[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip empty lines
+    if (!line.trim()) continue;
+    
+    // Headers
+    if (line.startsWith('# ')) {
+      blocks.push({
+        type: 'heading',
+        props: { level: 1 },
+        content: [{ type: 'text', text: line.substring(2), styles: {} }]
+      });
+    } else if (line.startsWith('## ')) {
+      blocks.push({
+        type: 'heading',
+        props: { level: 2 },
+        content: [{ type: 'text', text: line.substring(3), styles: {} }]
+      });
+    } else if (line.startsWith('### ')) {
+      blocks.push({
+        type: 'heading',
+        props: { level: 3 },
+        content: [{ type: 'text', text: line.substring(4), styles: {} }]
+      });
+    }
+    // Bullet points
+    else if (line.startsWith('- ') || line.startsWith('* ')) {
+      blocks.push({
+        type: 'bulletListItem',
+        content: [{ type: 'text', text: line.substring(2), styles: {} }]
+      });
+    }
+    // Horizontal rule
+    else if (line.trim() === '---') {
+      blocks.push({
+        type: 'paragraph',
+        content: [{ type: 'text', text: '---', styles: {} }]
+      });
+    }
+    // Regular paragraphs with bold handling
+    else {
+      const content = parseBoldText(line);
+      blocks.push({
+        type: 'paragraph',
+        content: content
+      });
+    }
+  }
+  
+  return blocks;
+}
+
+// Helper to parse **bold** text
+function parseBoldText(text: string) {
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  const content: any[] = [];
+
+  parts.forEach(part => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      content.push({
+        type: 'text',
+        text: part.slice(2, -2),
+        styles: { bold: true }
+      });
+    } else if (part) {
+      content.push({
+        type: 'text',
+        text: part,
+        styles: {}
+      });
+    }
+  });
+
+  // Ensure we always return at least one text node
+  if (content.length === 0) {
+    content.push({
+      type: 'text',
+      text: '',
+      styles: {}
+    });
+  }
+
+  return content;
+}
+
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -9,7 +100,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, context } = await req.json();
 
-    // Create a conversation summary for Claude
+    // [Keep your existing conversationText and documentPrompt - UNCHANGED]
     const conversationText = messages
       .map((m: { role: string; content: string }) => `${m.role === 'user' ? 'Expert' : 'Interviewer'}: ${m.content}`)
       .join('\n\n');
@@ -280,7 +371,14 @@ Begin creating the case study now. Tell the story well, extract the lessons clea
       ? response.content[0].text
       : '';
 
-    return NextResponse.json({ document: documentContent });
+    // Convert markdown to BlockNote JSON
+    const blockNoteContent = markdownToBlockNote(documentContent);
+
+    return NextResponse.json({ 
+      document: documentContent, // Keep markdown for backward compatibility
+      blockNoteBlocks: blockNoteContent, // New BlockNote format
+      format: 'blocknote'
+    });
   } catch (error) {
     console.error('Document generation error:', error);
     return NextResponse.json(

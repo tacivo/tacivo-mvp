@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
+    "@blocknote/core": "^0.44.2",
+    "@blocknote/mantine": "^0.44.2",
+    "@blocknote/react": "^0.44.2",
     "@elevenlabs/elevenlabs-js": "^2.24.1",
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.86.0",

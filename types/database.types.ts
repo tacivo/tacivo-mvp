@@ -228,7 +228,7 @@ export interface Database {
           title: string
           content: string
           document_type: 'case-study' | 'best-practices'
-          format: 'markdown' | 'pdf'
+          format: 'markdown' | 'pdf'| 'blocknote'
           file_url: string | null
           is_shared: boolean
           created_at: string
@@ -241,7 +241,7 @@ export interface Database {
           title: string
           content: string
           document_type: 'case-study' | 'best-practices'
-          format?: 'markdown' | 'pdf'
+          format?: 'markdown' | 'pdf'| 'blocknote'
           file_url?: string | null
           is_shared?: boolean
           created_at?: string
@@ -254,7 +254,7 @@ export interface Database {
           title?: string
           content?: string
           document_type?: 'case-study' | 'best-practices'
-          format?: 'markdown' | 'pdf'
+          format?: 'markdown' | 'pdf'| 'blocknote'
           file_url?: string | null
           is_shared?: boolean
           created_at?: string
