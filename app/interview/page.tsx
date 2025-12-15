@@ -217,16 +217,17 @@ function ExperiencePageContent() {
         throw new Error('Failed to generate document')
       }
 
-      const { document: documentContent } = await response.json()
+      const responseData = await response.json()
+      const { document: documentContent, blockNoteBlocks, format } = responseData
 
       // Save document to database
       const doc = await createDocument({
         interview_id: currentInterviewId,
         user_id: userProfile.id,
         title: context.title || context.process || 'Case Study',
-        content: documentContent,
+        content: format === 'blocknote' ? JSON.stringify(blockNoteBlocks) : documentContent,
         document_type: 'case-study',
-        format: 'markdown',
+        format: format || 'markdown',
         is_shared: false
       })
 
@@ -234,7 +235,8 @@ function ExperiencePageContent() {
       router.push(`/documents/${doc.id}`)
     } catch (error) {
       console.error('Error ending interview:', error)
-      alert('Failed to generate document. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Failed to generate document: ${errorMessage}. Please try again.`)
     } finally {
       setIsEndingInterview(false)
     }
