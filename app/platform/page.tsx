@@ -36,7 +36,10 @@ export default function PlatformHomePage() {
 
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          organization:organizations(name)
+        `)
         .eq('id', user.id)
         .single()
 
@@ -103,7 +106,7 @@ export default function PlatformHomePage() {
             Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
           </h1>
           <p className="text-lg text-muted-foreground">
-            Your knowledge workspace at {profile?.company || 'Tacivo'}
+            Your knowledge workspace at {(profile as any)?.organization?.name || 'Tacivo'}
           </p>
         </div>
 
