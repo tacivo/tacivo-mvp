@@ -34,7 +34,10 @@ export default function ProfilePage() {
 
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          organization:organizations(name)
+        `)
         .eq('id', user.id)
         .single()
 
@@ -245,14 +248,14 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Company (Read-only) */}
+            {/* Organization (Read-only) */}
             <div className="flex items-center gap-4 pb-4 border-b border-border">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-muted to-muted/70 flex items-center justify-center flex-shrink-0">
                 <Building2 className="w-6 h-6 text-muted-foreground" />
               </div>
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Company</p>
-                <p className="font-medium text-foreground">{profile?.company || 'Not set'}</p>
+                <p className="text-sm text-muted-foreground mb-1">Organization</p>
+                <p className="font-medium text-foreground">{(profile as any)?.organization?.name || 'Not set'}</p>
               </div>
             </div>
 

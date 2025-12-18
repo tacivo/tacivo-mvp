@@ -46,15 +46,18 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
         return
       }
 
-      // Get user's company name and admin status
+      // Get user's organization name and admin status
       const { data: profile } = await supabase
         .from('profiles')
-        .select('company, is_admin')
+        .select(`
+          is_admin,
+          organization:organizations(name)
+        `)
         .eq('id', user.id)
-        .single() as { data: { company: string | null; is_admin: boolean | null } | null }
+        .single() as { data: { is_admin: boolean | null; organization: { name: string } | null } | null }
 
-      if (profile?.company) {
-        setCompanyName(profile.company)
+      if (profile?.organization?.name) {
+        setCompanyName(profile.organization.name)
       }
 
       if (profile?.is_admin) {
