@@ -31,6 +31,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
   const [companyName, setCompanyName] = useState('Tacivo')
+  const [companyLogo, setCompanyLogo] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [privateExpanded, setPrivateExpanded] = useState(true)
@@ -46,18 +47,22 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
         return
       }
 
-      // Get user's organization name and admin status
+      // Get user's organization name, logo, and admin status
       const { data: profile } = await supabase
         .from('profiles')
         .select(`
           is_admin,
-          organization:organizations(name)
+          organization:organizations(name, logo_url)
         `)
         .eq('id', user.id)
-        .single() as { data: { is_admin: boolean | null; organization: { name: string } | null } | null }
+        .single() as { data: { is_admin: boolean | null; organization: { name: string; logo_url: string | null } | null } | null }
 
       if (profile?.organization?.name) {
         setCompanyName(profile.organization.name)
+      }
+
+      if (profile?.organization?.logo_url) {
+        setCompanyLogo(profile.organization.logo_url)
       }
 
       if (profile?.is_admin) {
@@ -107,9 +112,24 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
     <div className="flex h-screen bg-background">
       {/* Left Sidebar */}
       <aside className="w-64 bg-card border-r border-border flex flex-col overflow-y-auto">
-        {/* Company Name */}
+        {/* Company Name & Logo */}
         <div className="p-4 border-b border-border">
-          <h1 className="text-lg font-semibold text-foreground">{companyName}</h1>
+          <div className="flex items-center gap-3">
+            {companyLogo ? (
+              <img
+                src={companyLogo}
+                alt={`${companyName} logo`}
+                className="w-8 h-8 object-contain flex-shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded bg-accent/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-accent font-bold text-sm">
+                  {companyName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <h1 className="text-lg font-semibold text-foreground truncate">{companyName}</h1>
+          </div>
         </div>
 
         {/* Search */}

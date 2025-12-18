@@ -11,7 +11,7 @@ export default function GetStartedPage() {
     {
       icon: MicrophoneIcon,
       title: 'Start an Interview',
-      description: 'Share your personal experiences through an AI-powered conversation. Document specific projects (case studies) or repeatable processes (best practices).',
+      description: 'Share your personal experiences through an AI-powered conversation. It could be a success or even a failure - any experience holds incredible knowledge and lessons to be learned.',
       action: 'Start Interview',
       href: '/interview',
       comingSoon: false
@@ -21,7 +21,7 @@ export default function GetStartedPage() {
       title: 'Review Your Document',
       description: 'AI transforms your conversation into a structured, professional document. Edit and refine before sharing with your team.',
       action: 'View Documents',
-      href: '/documents',
+      href: '/platform/sessions/completed',
       comingSoon: false
     },
     {
@@ -29,7 +29,7 @@ export default function GetStartedPage() {
       title: 'Share with Your Team',
       description: 'Make your document accessible to colleagues. Your shared experiences help others learn from your successes and avoid pitfalls.',
       action: 'Share Documents',
-      href: '/documents',
+      href: '/platform/sessions/completed',
       comingSoon: false
     },
     {
