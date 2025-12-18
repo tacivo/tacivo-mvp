@@ -59,8 +59,12 @@ export async function POST(request: NextRequest) {
     // Get organization name
     const orgName = invitation.organization?.name || 'the organization'
 
+    // Get the base URL - works for Vercel preview deployments and production
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
     // Create invitation link
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${invitation.token}`
+    const inviteUrl = `${appUrl}/invite/${invitation.token}`
 
     // Send email
     const { data: emailData, error: emailError } = await resend.emails.send({

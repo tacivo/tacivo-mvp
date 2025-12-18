@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     const inviterName = inviter?.full_name || 'Tacivo Team'
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    // Get the base URL - works for Vercel preview deployments and production
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
     const inviteUrl = `${appUrl}/admin-invite/${invitation.token}`
 
     // Send email
