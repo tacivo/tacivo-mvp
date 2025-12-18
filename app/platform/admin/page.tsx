@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShieldCheckIcon, BuildingOfficeIcon, UsersIcon, ChartBarIcon } from '@heroicons/react/24/outline'
-import { Globe, Save, X, Plus, Rocket } from 'lucide-react'
+import { Globe, Save, X, Plus, Rocket, Upload, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Organization, Profile } from '@/types/database.types'
 
@@ -19,6 +19,7 @@ export default function AdminPage() {
   const [editedOrg, setEditedOrg] = useState({
     name: '',
     website: '',
+    logo_url: '',
     description: '',
     industry: '',
     size: ''
@@ -29,6 +30,9 @@ export default function AdminPage() {
     totalDocuments: 0,
     totalExperts: 0
   })
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string>('')
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
   useEffect(() => {
     checkAdminAccess()
@@ -58,7 +62,7 @@ export default function AdminPage() {
       setIsAdmin(true)
 
       await loadOrganization(typedProfile.organization_id)
-      await loadStats()
+      await loadStats(typedProfile.organization_id)
     } catch (error) {
       console.error('Error checking admin access:', error)
       router.push('/platform')
@@ -86,6 +90,7 @@ export default function AdminPage() {
         setEditedOrg({
           name: typedOrg.name || '',
           website: typedOrg.website || '',
+          logo_url: typedOrg.logo_url || '',
           description: typedOrg.description || '',
           industry: typedOrg.industry || '',
           size: typedOrg.size || ''
@@ -96,12 +101,22 @@ export default function AdminPage() {
     }
   }
 
-  async function loadStats() {
+  async function loadStats(orgId: string | null) {
+    if (!orgId) return
+
     try {
-      // Get total users
+      // Get total users in organization
       const { count: usersCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+
+      // Get total experts in organization
+      const { count: expertsCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('is_expert', true)
 
       // Get total interviews
       const { count: interviewsCount } = await supabase
@@ -117,10 +132,53 @@ export default function AdminPage() {
         totalUsers: usersCount || 0,
         totalInterviews: interviewsCount || 0,
         totalDocuments: documentsCount || 0,
-        totalExperts: 0 // Placeholder for future experts feature
+        totalExperts: expertsCount || 0
       })
     } catch (error) {
       console.error('Error loading stats:', error)
+    }
+  }
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setLogoFile(file)
+      // Create preview URL
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const uploadLogo = async (file: File, orgId: string): Promise<string | null> => {
+    try {
+      setIsUploadingLogo(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${orgId}-${Date.now()}.${fileExt}`
+      const filePath = `organization-logos/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('public-assets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('public-assets')
+        .getPublicUrl(filePath)
+
+      return publicUrl
+    } catch (error) {
+      console.error('Error uploading logo:', error)
+      alert('Failed to upload logo')
+      return null
+    } finally {
+      setIsUploadingLogo(false)
     }
   }
 
@@ -129,12 +187,23 @@ export default function AdminPage() {
 
     setIsSavingOrg(true)
     try {
+      let logoUrl = editedOrg.logo_url
+
+      // Upload logo if a new file was selected
+      if (logoFile) {
+        const uploadedUrl = await uploadLogo(logoFile, organization.id)
+        if (uploadedUrl) {
+          logoUrl = uploadedUrl
+        }
+      }
+
       const { error } = await supabase
         .from('organizations')
         // @ts-expect-error - Supabase type inference issue
         .update({
           name: editedOrg.name,
           website: editedOrg.website,
+          logo_url: logoUrl,
           description: editedOrg.description,
           industry: editedOrg.industry,
           size: editedOrg.size
@@ -143,6 +212,8 @@ export default function AdminPage() {
 
       if (error) throw error
 
+      setLogoFile(null)
+      setLogoPreview('')
       await loadOrganization(organization.id)
       setIsEditingOrg(false)
     } catch (error) {
@@ -221,6 +292,7 @@ export default function AdminPage() {
       setEditedOrg({
         name: organization.name || '',
         website: organization.website || '',
+        logo_url: organization.logo_url || '',
         description: organization.description || '',
         industry: organization.industry || '',
         size: organization.size || ''
@@ -481,7 +553,65 @@ export default function AdminPage() {
                     <p className="text-muted-foreground">Not set</p>
                   )}
                 </div>
+              </div>
 
+              {/* Logo Upload Section - Full Width */}
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Organization Logo
+                </label>
+                {isEditingOrg ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-4">
+                      {/* Current or Preview Logo */}
+                      <div className="flex-shrink-0">
+                        {logoPreview || organization.logo_url ? (
+                          <img
+                            src={logoPreview || organization.logo_url || ''}
+                            alt="Organization logo"
+                            className="w-24 h-24 object-contain rounded-lg border border-border bg-muted"
+                          />
+                        ) : (
+                          <div className="w-24 h-24 rounded-lg border border-border bg-muted flex items-center justify-center">
+                            <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Upload Button */}
+                      <div className="flex-1">
+                        <input
+                          type="file"
+                          id="logo-upload"
+                          accept="image/*"
+                          onChange={handleLogoChange}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="logo-upload"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors cursor-pointer"
+                        >
+                          <Upload className="w-4 h-4" />
+                          {logoPreview || organization.logo_url ? 'Change Logo' : 'Upload Logo'}
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Recommended: Square image, at least 200x200px. PNG or JPG format.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt="Organization logo"
+                    className="w-24 h-24 object-contain rounded-lg border border-border bg-muted"
+                  />
+                ) : (
+                  <p className="text-muted-foreground">No logo uploaded</p>
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Industry

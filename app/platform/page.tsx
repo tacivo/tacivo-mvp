@@ -110,26 +110,6 @@ export default function PlatformHomePage() {
           </p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-4 gap-6 mb-12">
-          <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-            <p className="text-3xl font-semibold text-foreground mb-1">{stats.totalInterviews}</p>
-            <p className="text-sm text-muted-foreground">Interviews</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-            <p className="text-3xl font-semibold text-foreground mb-1">{stats.completedInterviews}</p>
-            <p className="text-sm text-muted-foreground">Completed</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-            <p className="text-3xl font-semibold text-foreground mb-1">{stats.totalDocuments}</p>
-            <p className="text-sm text-muted-foreground">Documents</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-            <p className="text-3xl font-semibold text-foreground mb-1">{stats.hoursEstimated.toFixed(1)}</p>
-            <p className="text-sm text-muted-foreground">Hours Saved</p>
-          </div>
-        </div>
-
         <div className="grid grid-cols-3 gap-8">
           {/* Main Content - 2 columns */}
           <div className="col-span-2 space-y-8">
