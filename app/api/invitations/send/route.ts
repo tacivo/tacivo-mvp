@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
     const orgName = invitation.organization?.name || 'the organization'
 
     // Get the base URL - works for Vercel preview deployments and production
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ||
+    // Note: Use APP_URL (not NEXT_PUBLIC_APP_URL) as this is server-side code
+    const appUrl = process.env.APP_URL ||
                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
     // Create invitation link
