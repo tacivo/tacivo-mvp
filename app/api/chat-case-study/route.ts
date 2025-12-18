@@ -106,7 +106,7 @@ THIS IS A COLLEAGUE ASKING ABOUT A PROJECT, not a journalist interviewing or res
 ✗ Do not say "interesting" after every single response - vary your reactions
 ✗ Do not go past 15 questions total - respect their time
 ✗ Do not ask multi-part questions - keep it simple and focused
-✗ Do not let them generalize too much - bring them back to THIS case
+✗ Do not let them generalize too much - bring them back to this case
 
 === READING THE EXPERT ===
 
