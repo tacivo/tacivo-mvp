@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShieldCheckIcon, BuildingOfficeIcon, UsersIcon, ChartBarIcon } from '@heroicons/react/24/outline'
-import { Globe, Save, X, Plus } from 'lucide-react'
+import { Globe, Save, X, Plus, Rocket } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Organization, Profile } from '@/types/database.types'
 
@@ -251,6 +251,31 @@ export default function AdminPage() {
         <p className="text-lg text-muted-foreground">
           Manage your organization, experts, and view analytics
         </p>
+      </div>
+
+      {/* Get Started Guide Card */}
+      <div className="mb-8">
+        <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl border border-accent/20 p-6">
+          <div className="flex items-start gap-6">
+            <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center flex-shrink-0">
+              <Rocket className="w-6 h-6 text-accent-foreground" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                Admin Setup Guide
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                New to Tacivo? Learn how to set up your organization, invite team members, and get started with knowledge capture.
+              </p>
+              <button
+                onClick={() => router.push('/platform/admin/get-started')}
+                className="px-4 py-2 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+              >
+                View Setup Guide
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
