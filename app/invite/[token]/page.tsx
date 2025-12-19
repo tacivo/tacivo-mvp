@@ -23,43 +23,31 @@ export default function InviteAcceptPage({ params }: { params: Promise<{ token: 
 
   async function loadInvitation() {
     try {
-      const { data: inviteData, error: inviteError } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('token', token)
-        .single()
+      // Call secure API endpoint instead of direct Supabase query
+      // This bypasses RLS using service role on the server side
+      const response = await fetch('/api/invitations/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          type: 'regular' // or 'admin' for admin invitations
+        })
+      })
 
-      if (inviteError || !inviteData) {
-        setError('Invitation not found')
+      if (!response.ok) {
+        const errorData = await response.json()
+        setError(errorData.error || 'Invitation not found')
         setIsLoading(false)
         return
       }
 
-      const typedInvite = inviteData as unknown as Invitation
+      const data = await response.json()
+      const typedInvite = data.invitation as unknown as Invitation
 
-      // Check if expired
-      if (new Date(typedInvite.expires_at) < new Date()) {
-        setError('This invitation has expired')
-        setIsLoading(false)
-        return
-      }
-
-      // Check if already accepted
-      if (typedInvite.status === 'accepted') {
-        setError('This invitation has already been used')
-        setIsLoading(false)
-        return
-      }
-
-      // Load organization
-      const { data: orgData } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', typedInvite.organization_id)
-        .single()
-
-      if (orgData) {
-        setOrganization(orgData as unknown as Organization)
+      if (data.organization) {
+        setOrganization(data.organization as unknown as Organization)
       }
 
       setInvitation(typedInvite)
