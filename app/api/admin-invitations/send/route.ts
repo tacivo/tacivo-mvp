@@ -63,12 +63,12 @@ export async function POST(request: NextRequest) {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
               body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                 line-height: 1.6;
-                color: #333;
+                color: #191919;
                 margin: 0;
                 padding: 0;
-                background-color: #f4f4f5;
+                background-color: #FAFAF7;
               }
               .container {
                 max-width: 600px;
@@ -76,15 +76,15 @@ export async function POST(request: NextRequest) {
                 background: white;
                 border-radius: 16px;
                 overflow: hidden;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
               }
               .header {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #CC785C 0%, #D4A27F 100%);
                 padding: 40px 30px;
                 text-align: center;
               }
               .header h1 {
-                color: white;
+                color: #FAFAF7;
                 margin: 0;
                 font-size: 28px;
                 font-weight: 600;
@@ -93,32 +93,32 @@ export async function POST(request: NextRequest) {
                 padding: 40px 30px;
               }
               .content h2 {
-                color: #18181b;
+                color: #191919;
                 font-size: 22px;
                 margin-top: 0;
                 margin-bottom: 16px;
               }
               .content p {
-                color: #52525b;
+                color: #666663;
                 margin: 16px 0;
               }
               .info-box {
-                background: #f4f4f5;
+                background: #F0F0EB;
                 border-radius: 12px;
                 padding: 20px;
                 margin: 24px 0;
               }
               .info-box p {
                 margin: 8px 0;
-                color: #18181b;
+                color: #191919;
               }
               .info-box strong {
-                color: #667eea;
+                color: #CC785C;
               }
               .button {
                 display: inline-block;
-                background: #667eea;
-                color: white;
+                background: #CC785C;
+                color: #FAFAF7;
                 padding: 14px 32px;
                 text-decoration: none;
                 border-radius: 8px;
@@ -127,29 +127,29 @@ export async function POST(request: NextRequest) {
                 transition: background 0.2s;
               }
               .button:hover {
-                background: #5568d3;
+                background: #B8674A;
               }
               .footer {
-                background: #fafafa;
+                background: #F0F0EB;
                 padding: 30px;
                 text-align: center;
-                color: #71717a;
+                color: #666663;
                 font-size: 14px;
-                border-top: 1px solid #e4e4e7;
+                border-top: 1px solid #E5E4DF;
               }
               .footer p {
                 margin: 8px 0;
               }
               .expire-notice {
-                background: #fef3c7;
-                border-left: 4px solid #f59e0b;
+                background: #EBDBBC;
+                border-left: 4px solid #D4A27F;
                 padding: 16px;
                 margin: 24px 0;
                 border-radius: 4px;
               }
               .expire-notice p {
                 margin: 0;
-                color: #92400e;
+                color: #191919;
                 font-size: 14px;
               }
             </style>
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
                 <p>
                   As an admin, you'll be able to:
                 </p>
-                <ul style="color: #52525b; margin: 16px 0; padding-left: 24px;">
+                <ul style="color: #666663; margin: 16px 0; padding-left: 24px;">
                   <li>Set up and manage your organization</li>
                   <li>Invite team members and experts</li>
                   <li>Access all platform features and analytics</li>
@@ -186,10 +186,10 @@ export async function POST(request: NextRequest) {
                   <p>⏰ <strong>Important:</strong> This invitation expires in 7 days. Please accept it before ${new Date(invitation.expires_at).toLocaleDateString()}.</p>
                 </div>
 
-                <p style="font-size: 14px; color: #71717a; margin-top: 32px;">
+                <p style="font-size: 14px; color: #666663; margin-top: 32px;">
                   If the button doesn't work, copy and paste this link into your browser:
                 </p>
-                <p style="font-size: 13px; color: #667eea; word-break: break-all;">
+                <p style="font-size: 13px; color: #CC785C; word-break: break-all;">
                   ${inviteUrl}
                 </p>
               </div>

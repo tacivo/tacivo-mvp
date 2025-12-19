@@ -79,38 +79,38 @@ export async function POST(request: NextRequest) {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
           </head>
-          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">You're Invited!</h1>
+          <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #191919; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #FAFAF7;">
+            <div style="background: linear-gradient(135deg, #CC785C 0%, #D4A27F 100%); padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="color: #FAFAF7; margin: 0; font-size: 28px; font-weight: 600;">You're Invited!</h1>
             </div>
 
-            <div style="background: #ffffff; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-              <p style="font-size: 16px; margin-bottom: 20px;">Hi ${invitation.full_name},</p>
+            <div style="background: #ffffff; padding: 40px; border: 1px solid #E5E4DF; border-top: none; border-radius: 0 0 8px 8px;">
+              <p style="font-size: 16px; margin-bottom: 20px; color: #191919;">Hi ${invitation.full_name},</p>
 
-              <p style="font-size: 16px; margin-bottom: 20px;">
+              <p style="font-size: 16px; margin-bottom: 20px; color: #191919;">
                 You've been invited to join <strong>${orgName}</strong> on Tacivo${invitation.is_admin ? ' as an <strong>Admin</strong>' : ''}${invitation.is_expert ? ' as an <strong>Expert</strong>' : ''}.
               </p>
 
-              ${invitation.role ? `<p style="font-size: 16px; margin-bottom: 20px;">Role: <strong>${invitation.role}</strong></p>` : ''}
+              ${invitation.role ? `<p style="font-size: 16px; margin-bottom: 20px; color: #191919;">Role: <strong>${invitation.role}</strong></p>` : ''}
 
-              ${invitation.goal ? `<p style="font-size: 16px; margin-bottom: 20px; padding: 16px; background: #f9fafb; border-left: 4px solid #667eea; border-radius: 4px;">${invitation.goal}</p>` : ''}
+              ${invitation.goal ? `<p style="font-size: 16px; margin-bottom: 20px; padding: 16px; background: #F0F0EB; border-left: 4px solid #CC785C; border-radius: 4px; color: #191919;">${invitation.goal}</p>` : ''}
 
-              <p style="font-size: 16px; margin-bottom: 30px;">
+              <p style="font-size: 16px; margin-bottom: 30px; color: #191919;">
                 Click the button below to accept your invitation and create your account.
               </p>
 
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${inviteUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                <a href="${inviteUrl}" style="display: inline-block; background: #CC785C; color: #FAFAF7; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
                   Accept Invitation
                 </a>
               </div>
 
-              <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+              <p style="font-size: 14px; color: #666663; margin-top: 30px;">
                 Or copy and paste this link into your browser:<br>
-                <a href="${inviteUrl}" style="color: #667eea; word-break: break-all;">${inviteUrl}</a>
+                <a href="${inviteUrl}" style="color: #CC785C; word-break: break-all;">${inviteUrl}</a>
               </p>
 
-              <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+              <p style="font-size: 14px; color: #666663; margin-top: 30px;">
                 This invitation will expire on ${new Date(invitation.expires_at).toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
               </p>
             </div>
 
-            <div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+            <div style="text-align: center; margin-top: 30px; color: #8F8F8C; font-size: 12px;">
               <p>© ${new Date().getFullYear()} Tacivo. All rights reserved.</p>
             </div>
           </body>
