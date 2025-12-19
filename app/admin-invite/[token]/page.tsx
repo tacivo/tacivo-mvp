@@ -49,34 +49,28 @@ export default function AdminInviteAcceptPage({ params }: { params: Promise<{ to
 
   async function loadInvitation() {
     try {
-      // Create a service role client to bypass RLS for reading invitation
-      const { data: inviteData, error: inviteError } = await supabase
-        .from('admin_invitations')
-        .select('*')
-        .eq('token', token)
-        .single()
+      // Call secure API endpoint instead of direct Supabase query
+      // This bypasses RLS using service role on the server side
+      const response = await fetch('/api/invitations/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          type: 'admin' // Admin invitation type
+        })
+      })
 
-      if (inviteError || !inviteData) {
-        setError('Invitation not found')
+      if (!response.ok) {
+        const errorData = await response.json()
+        setError(errorData.error || 'Invitation not found')
         setIsLoading(false)
         return
       }
 
-      const typedInvite = inviteData as unknown as AdminInvitation
-
-      // Check if expired
-      if (new Date(typedInvite.expires_at) < new Date()) {
-        setError('This invitation has expired')
-        setIsLoading(false)
-        return
-      }
-
-      // Check if already accepted
-      if (typedInvite.status === 'accepted') {
-        setError('This invitation has already been used')
-        setIsLoading(false)
-        return
-      }
+      const data = await response.json()
+      const typedInvite = data.invitation as unknown as AdminInvitation
 
       setInvitation(typedInvite)
 
