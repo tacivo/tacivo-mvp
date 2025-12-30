@@ -29,7 +29,7 @@ A comprehensive page to view and manage all your interviews.
   - Opens full document view page
 
 - ✅ **Delete Interviews**
-  - Trash icon button with confirmation
+  - Trash icon button with a confirmation
   - Deletes interview and all related data (messages, documents)
 
 ### 2. **Document View Page** (`/documents/[id]`)
