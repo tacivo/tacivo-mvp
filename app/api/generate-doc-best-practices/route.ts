@@ -355,7 +355,7 @@ Make it scannable - busy people should be able to skim headers and bolded conten
 Begin creating the guide now. Focus on practical value, proven techniques, and respect for the reader's time. Make this something someone would actually reference and use.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 4000,
       messages: [
         {

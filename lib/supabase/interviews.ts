@@ -358,6 +358,56 @@ export async function getOrganizationExperts() {
 }
 
 /**
+ * Get all documents accessible to the current user (shared company docs + user's own docs)
+ */
+export async function getAccessibleDocuments() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Get shared documents from company
+  const { data: sharedDocs, error: sharedError } = await supabase
+    .from('documents')
+    .select(`
+      *,
+      profiles:user_id (
+        id,
+        full_name,
+        role,
+        company
+      )
+    `)
+    .eq('is_shared', true)
+    .order('created_at', { ascending: false })
+
+  if (sharedError) throw sharedError
+
+  // Get user's own documents (both shared and private)
+  const { data: ownDocs, error: ownError } = await supabase
+    .from('documents')
+    .select(`
+      *,
+      profiles:user_id (
+        id,
+        full_name,
+        role,
+        company
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (ownError) throw ownError
+
+  // Combine and deduplicate (in case user's shared docs appear in both)
+  const allDocs = [...(sharedDocs || []), ...(ownDocs || [])]
+  const uniqueDocs = allDocs.filter((doc: any, index: number, self: any[]) => 
+    self.findIndex((d: any) => d.id === doc.id) === index
+  )
+
+  return uniqueDocs as any[]
+}
+
+/**
  * Get shared documents by a specific expert
  */
 export async function getExpertDocuments(expertId: string) {

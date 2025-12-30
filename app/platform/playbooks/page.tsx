@@ -1,25 +1,372 @@
 'use client'
 
-import { BookOpenIcon } from '@heroicons/react/24/outline'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, FileCheck, Users, Building, Loader2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { getAccessibleDocuments } from '@/lib/supabase/interviews'
+import { getUserInterviews } from '@/lib/supabase/interviews'
+import { Profile } from '@/types/database.types'
+
+type AccessibleDocument = {
+  id: string
+  title: string
+  document_type: 'case-study' | 'best-practices'
+  created_at: string
+  user_id: string
+  is_shared: boolean
+  profiles?: {
+    full_name: string | null
+    role: string | null
+  }
+}
+
+type GenerationType = 'playbook' | 'guide' | 'best-practices' | 'company-document'
 
 export default function PlaybooksPage() {
+  const router = useRouter()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [documents, setDocuments] = useState<AccessibleDocument[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
+  const [generationType, setGenerationType] = useState<GenerationType>('playbook')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      setProfile(profileData as unknown as Profile)
+
+      const accessibleDocs = await getAccessibleDocuments()
+      console.log('Accessible documents:', accessibleDocs.map(doc => ({ id: doc.id, title: doc.title, contentLength: doc.content?.length || 0, hasContent: !!(doc.content && doc.content.trim()) })))
+      setDocuments(accessibleDocs as AccessibleDocument[])
+
+      // Check if user has any interviews
+      const userInterviews = await getUserInterviews()
+      console.log('User interviews:', userInterviews.length, 'total')
+
+      // Check if user has any documents at all
+      if (accessibleDocs.length === 0) {
+        console.log('No accessible documents found. User needs to complete interviews first.')
+        if (userInterviews.length === 0) {
+          console.log('User has no interviews at all. They need to start interviews.')
+        } else {
+          console.log('User has interviews but no documents. They need to complete and generate documents.')
+        }
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
+  const filteredDocuments = documents.filter(doc => {
+    const searchLower = searchQuery.toLowerCase()
+    return (
+      doc.title.toLowerCase().includes(searchLower) ||
+      doc.profiles?.full_name?.toLowerCase().includes(searchLower) ||
+      doc.profiles?.role?.toLowerCase().includes(searchLower)
+    )
+  })
+
+  const handleSelectDocument = (docId: string) => {
+    const newSelected = new Set(selectedDocuments)
+    if (newSelected.has(docId)) {
+      newSelected.delete(docId)
+    } else {
+      newSelected.add(docId)
+    }
+    setSelectedDocuments(newSelected)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedDocuments.size === filteredDocuments.length) {
+      setSelectedDocuments(new Set())
+    } else {
+      setSelectedDocuments(new Set(filteredDocuments.map(doc => doc.id)))
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (selectedDocuments.size < 5) return
+
+    setIsGenerating(true)
+    try {
+      const response = await fetch('/api/generate-playbook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentIds: Array.from(selectedDocuments),
+          type: generationType,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate playbook')
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate playbook')
+      }
+
+      const result = await response.json()
+
+      // For now, just show the result in console - you might want to save it or show in a modal
+      console.log('Generated content:', result)
+
+      if (result.error) {
+        alert(`Generation failed: ${result.error}`)
+      } else {
+        alert('Playbook generated successfully! Check console for content.')
+      }
+
+    } catch (error) {
+      console.error('Error generating playbook:', error)
+      alert('Failed to generate playbook. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const getGenerationTypeIcon = (type: GenerationType) => {
+    switch (type) {
+      case 'playbook': return <BookOpen className="w-5 h-5" />
+      case 'guide': return <FileText className="w-5 h-5" />
+      case 'best-practices': return <FileCheck className="w-5 h-5" />
+      case 'company-document': return <Building className="w-5 h-5" />
+    }
+  }
+
+  const getGenerationTypeLabel = (type: GenerationType) => {
+    switch (type) {
+      case 'playbook': return 'Playbook'
+      case 'guide': return 'Guide'
+      case 'best-practices': return 'Best Practices'
+      case 'company-document': return 'Company Document'
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="inline-block w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-5xl mx-auto px-8 py-12">
+    <div className="max-w-7xl mx-auto px-8 py-12">
+      {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Playbooks</h1>
+        <h1 className="text-4xl font-semibold text-foreground mb-2">Create Playbooks</h1>
         <p className="text-muted-foreground">
-          Synthesized patterns and best practices from your organization
+          Synthesize patterns and best practices from multiple experiences to create comprehensive guides
         </p>
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-12 text-center">
-        <BookOpenIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-        <h2 className="text-xl font-semibold text-foreground mb-2">Coming Soon</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          AI-generated playbooks will synthesize patterns from multiple experiences,
-          creating actionable frameworks for your team.
-        </p>
+      {/* Generation Controls */}
+      <div className="bg-card rounded-xl border border-border p-6 mb-8">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Selection Summary */}
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Selected Experiences</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {selectedDocuments.size} of {filteredDocuments.length} experiences selected
+              {selectedDocuments.size < 5 && (
+                <span className="text-orange-600 ml-2">
+                  (minimum 5 required)
+                </span>
+              )}
+            </p>
+            {selectedDocuments.size >= 5 && (
+              <div className="flex items-center gap-2 text-green-600 text-sm">
+                <CheckCircle className="w-4 h-4" />
+                Ready to generate
+              </div>
+            )}
+          </div>
+
+          {/* Generation Type Selector */}
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Generation Type</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {(['playbook', 'guide', 'best-practices', 'company-document'] as GenerationType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setGenerationType(type)}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    generationType === type
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-border hover:border-accent/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {getGenerationTypeIcon(type)}
+                    <span className="text-sm font-medium">{getGenerationTypeLabel(type)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Generate Button */}
+          <div className="flex items-end">
+            <button
+              onClick={handleGenerate}
+              disabled={selectedDocuments.size < 5 || isGenerating}
+              className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <BookOpen className="w-4 h-4" />
+                  Generate {getGenerationTypeLabel(generationType)}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Search and Select All */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search experiences..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-4 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+          />
+        </div>
+        <button
+          onClick={handleSelectAll}
+          className="px-4 py-2 border border-border rounded-lg hover:border-accent/50 transition-colors text-sm"
+        >
+          {selectedDocuments.size === filteredDocuments.length ? 'Deselect All' : 'Select All'}
+        </button>
+      </div>
+
+      {/* Documents Grid */}
+      {filteredDocuments.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-12 text-center">
+          <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
+            {searchQuery ? 'No experiences found' : 'No experiences available'}
+          </h2>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            {searchQuery
+              ? 'Try adjusting your search terms'
+              : 'Complete some interviews and share experiences to start creating playbooks.'
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDocuments.map((doc, index) => (
+            <motion.div
+              key={doc.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+              className={`bg-card rounded-lg border p-6 hover:shadow-md transition-all cursor-pointer group ${
+                selectedDocuments.has(doc.id)
+                  ? 'border-accent bg-accent/5'
+                  : 'border-border hover:border-accent/40'
+              }`}
+              onClick={() => handleSelectDocument(doc.id)}
+            >
+              {/* Checkbox */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6 text-accent" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedDocuments.has(doc.id)}
+                    onChange={() => handleSelectDocument(doc.id)}
+                    className="w-4 h-4 text-accent border-border rounded focus:ring-accent"
+                  />
+                  {doc.is_shared && (
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+
+              {/* Title */}
+              <h3 className="text-lg font-semibold text-foreground mb-3 line-clamp-2 group-hover:text-accent transition-colors">
+                {doc.title}
+              </h3>
+
+              {/* Type Badge */}
+              <div className="mb-3">
+                <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground">
+                  {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
+                </span>
+              </div>
+
+              {/* Metadata */}
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {doc.profiles?.full_name && (
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">
+                      {doc.profiles.full_name}
+                      {doc.profiles.role && ` • ${doc.profiles.role}`}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 flex-shrink-0" />
+                  <span>{formatDate(doc.created_at)}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Stats Footer */}
+      {documents.length > 0 && (
+        <div className="mt-8 text-center text-sm text-muted-foreground">
+          Showing {filteredDocuments.length} of {documents.length} accessible experience{documents.length !== 1 ? 's' : ''}
+        </div>
+      )}
     </div>
   )
 }
