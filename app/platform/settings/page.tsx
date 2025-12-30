@@ -137,7 +137,7 @@ export default function SettingsPage() {
           <h2 className="text-xl font-semibold text-foreground mb-4">About Tacivo</h2>
           <div className="text-sm text-muted-foreground space-y-2">
             <p>Version 1.0.0</p>
-            <p>© 2024 Tacivo. All rights reserved.</p>
+            <p>© 2026 Tacivo. All rights reserved.</p>
           </div>
         </div>
       </div>
