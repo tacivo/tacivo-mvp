@@ -174,7 +174,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
               ) : (
                 <ChevronRightIcon className="w-3 h-3" />
               )}
-              Private
+              Private Database
             </button>
             {privateExpanded && (
               <div className="mt-1 space-y-1">

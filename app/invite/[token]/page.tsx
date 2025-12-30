@@ -138,7 +138,7 @@ export default function InviteAcceptPage({ params }: { params: Promise<{ token: 
       }
 
       alert('Welcome to Tacivo! Your account has been created successfully.')
-      router.push('/platform')
+      router.push('/platform/profile?edit=true')
 
     } catch (err: any) {
       console.error('Error accepting invitation:', err)

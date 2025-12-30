@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { UserIcon, BriefcaseIcon, CalendarIcon } from '@heroicons/react/24/outline'
 import { LogOut, User, Building2, Mail, Save, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
@@ -9,9 +9,10 @@ import { Profile } from '@/types/database.types'
 
 export default function ProfilePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(searchParams.get('edit') === 'true')
   const [isSaving, setIsSaving] = useState(false)
   const [editedProfile, setEditedProfile] = useState({
     full_name: '',
