@@ -61,11 +61,13 @@ export default function GetStartedPage() {
           <h1 className="text-5xl font-bold text-foreground mb-4 bg-clip-text">
             Get Started with Tacivo
           </h1>
-          <div className="space-y-3 max-w-3xl mx-auto">
-            <p className="text-xl text-muted-foreground">
-              Share your personal experiences and help your team learn from what you've built, solved, and discovered.
-            </p>
-            <p className="text-base text-muted-foreground">
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+            Share your personal experiences and help your team learn from what you've built, solved, and discovered.
+          </p>
+
+          {/* Callout */}
+          <div className="mt-8 max-w-3xl mx-auto bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/30 rounded-xl p-6 shadow-sm">
+            <p className="text-base text-foreground/90 leading-relaxed">
               Your knowledge is valuable. When you document your real-world experiences, you help colleagues avoid mistakes,
               accelerate their learning, and build on your successes. Every shared experience strengthens your organization's
               collective intelligence.
