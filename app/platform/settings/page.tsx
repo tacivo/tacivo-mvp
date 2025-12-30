@@ -136,7 +136,7 @@ export default function SettingsPage() {
         <div className="bg-secondary rounded-xl border border-border p-6">
           <h2 className="text-xl font-semibold text-foreground mb-4">About Tacivo</h2>
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>Version 1.0.0</p>
+            <p>Version 1.0.1</p>
             <p>© 2026 Tacivo. All rights reserved.</p>
           </div>
         </div>

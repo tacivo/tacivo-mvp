@@ -207,7 +207,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
               ) : (
                 <ChevronRightIcon className="w-3 h-3" />
               )}
-              Collective
+              Public Database
             </button>
             {collectiveExpanded && (
               <div className="mt-1 space-y-1">
