@@ -19,7 +19,8 @@ import {
   ChevronRightIcon,
   UserIcon,
   ShieldCheckIcon,
-  PlusIcon
+  PlusIcon,
+  PencilSquareIcon
 } from '@heroicons/react/24/outline'
 
 interface PlatformLayoutProps {
@@ -90,6 +91,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
   const collectiveItems = [
     { icon: LightBulbIcon, label: 'Experiences', href: '/platform/experiences' },
     { icon: BookOpenIcon, label: 'Playbooks', href: '/platform/playbooks' },
+    { icon: PencilSquareIcon, label: 'Update Playbooks', href: '/platform/playbooks/update' },
     { icon: UserGroupIcon, label: 'Experts', href: '/platform/experts' },
   ]
 

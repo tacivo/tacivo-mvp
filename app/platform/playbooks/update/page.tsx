@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, FileCheck, Users, Building, Loader2 } from 'lucide-react'
+import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, FileCheck, Users, Building, Loader2, Upload, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getAccessibleDocuments } from '@/lib/supabase/interviews'
 import { getUserInterviews } from '@/lib/supabase/interviews'
@@ -22,17 +22,16 @@ type AccessibleDocument = {
   }
 }
 
-type GenerationType = 'playbook' | 'guide' | 'best-practices' | 'company-document'
-
-export default function PlaybooksPage() {
+export default function UpdatePlaybooksPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [documents, setDocuments] = useState<AccessibleDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
-  const [generationType, setGenerationType] = useState<GenerationType>('playbook')
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [dragActive, setDragActive] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -55,7 +54,6 @@ export default function PlaybooksPage() {
       setProfile(profileData as unknown as Profile)
 
       const accessibleDocs = await getAccessibleDocuments()
-      console.log('Accessible documents:', accessibleDocs.map(doc => ({ id: doc.id, title: doc.title, contentLength: doc.content?.length || 0, hasContent: !!(doc.content && doc.content.trim()) })))
       setDocuments(accessibleDocs as AccessibleDocument[])
 
       // Check if user has any interviews
@@ -114,65 +112,75 @@ export default function PlaybooksPage() {
     }
   }
 
-  const handleGenerate = async () => {
-    if (selectedDocuments.size < 5) return
+  const handleFileUpload = (file: File) => {
+    if (file.type !== 'application/pdf' && !file.name.endsWith('.docx') && !file.name.endsWith('.txt')) {
+      alert('Please upload a PDF, DOCX, or TXT file')
+      return
+    }
+    setUploadedFile(file)
+  }
 
-    setIsGenerating(true)
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0])
+    }
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0])
+    }
+  }
+
+  const removeFile = () => {
+    setUploadedFile(null)
+  }
+
+  const handleUpdate = async () => {
+    if (!uploadedFile || selectedDocuments.size === 0) return
+
+    setIsUpdating(true)
     try {
-      const response = await fetch('/api/generate-playbook', {
+      const formData = new FormData()
+      formData.append('playbook', uploadedFile)
+      formData.append('documentIds', JSON.stringify(Array.from(selectedDocuments)))
+
+      const response = await fetch('/api/update-playbook', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          documentIds: Array.from(selectedDocuments),
-          type: generationType,
-        }),
+        body: formData,
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate playbook')
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate playbook')
+        throw new Error('Failed to update playbook')
       }
 
       const result = await response.json()
 
-      // For now, just show the result in console - you might want to save it or show in a modal
-      console.log('Generated content:', result)
-
       if (result.error) {
-        alert(`Generation failed: ${result.error}`)
+        alert(`Update failed: ${result.error}`)
       } else {
-        alert('Playbook generated successfully! Check console for content.')
+        alert('Playbook updated successfully!')
+        setUploadedFile(null)
+        setSelectedDocuments(new Set())
       }
-
     } catch (error) {
-      console.error('Error generating playbook:', error)
-      alert('Failed to generate playbook. Please try again.')
+      console.error('Error updating playbook:', error)
+      alert('Failed to update playbook. Please try again.')
     } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const getGenerationTypeIcon = (type: GenerationType) => {
-    switch (type) {
-      case 'playbook': return <BookOpen className="w-5 h-5" />
-      case 'guide': return <FileText className="w-5 h-5" />
-      case 'best-practices': return <FileCheck className="w-5 h-5" />
-      case 'company-document': return <Building className="w-5 h-5" />
-    }
-  }
-
-  const getGenerationTypeLabel = (type: GenerationType) => {
-    switch (type) {
-      case 'playbook': return 'Playbook'
-      case 'guide': return 'Guide'
-      case 'best-practices': return 'Best Practices'
-      case 'company-document': return 'Company Document'
+      setIsUpdating(false)
     }
   }
 
@@ -188,73 +196,99 @@ export default function PlaybooksPage() {
     <div className="max-w-7xl mx-auto px-8 py-12">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Create Playbooks</h1>
+        <h1 className="text-4xl font-semibold text-foreground mb-2">Update Playbooks</h1>
         <p className="text-muted-foreground">
-          Synthesize patterns and best practices from multiple experiences to create comprehensive guides
+          Upload an existing playbook or guide and incorporate new experiences to keep it current
         </p>
       </div>
 
-      {/* Generation Controls */}
+      {/* File Upload Section */}
+      <div className="bg-card rounded-xl border border-border p-6 mb-8">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Upload Existing Playbook</h3>
+        {!uploadedFile ? (
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              dragActive ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground mb-4">
+              Drag and drop your playbook file here, or click to browse
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Supported formats: PDF, DOCX, TXT
+            </p>
+            <input
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={handleFileInput}
+              className="hidden"
+              id="file-upload"
+            />
+            <label
+              htmlFor="file-upload"
+              className="px-4 py-2 bg-accent text-accent-foreground rounded-lg cursor-pointer hover:bg-accent/90 transition-colors"
+            >
+              Choose File
+            </label>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+            <div className="flex items-center gap-3">
+              <FileText className="w-8 h-8 text-accent" />
+              <div>
+                <p className="font-medium text-foreground">{uploadedFile.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={removeFile}
+              className="p-1 hover:bg-destructive/10 rounded"
+            >
+              <X className="w-5 h-5 text-muted-foreground hover:text-destructive" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Selection Summary */}
       <div className="bg-card rounded-xl border border-border p-6 mb-8">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Selection Summary */}
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-foreground mb-2">Selected Experiences</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {selectedDocuments.size} of {filteredDocuments.length} experiences selected
-              {selectedDocuments.size < 5 && (
-                <span className="text-orange-600 ml-2">
-                  (minimum 5 required)
-                </span>
-              )}
             </p>
-            {selectedDocuments.size >= 5 && (
+            {selectedDocuments.size > 0 && uploadedFile && (
               <div className="flex items-center gap-2 text-green-600 text-sm">
                 <CheckCircle className="w-4 h-4" />
-                Ready to generate
+                Ready to update
               </div>
             )}
           </div>
 
-          {/* Generation Type Selector */}
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground mb-2">Generation Type</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {(['playbook', 'guide', 'best-practices', 'company-document'] as GenerationType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setGenerationType(type)}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    generationType === type
-                      ? 'border-accent bg-accent/10 text-accent'
-                      : 'border-border hover:border-accent/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {getGenerationTypeIcon(type)}
-                    <span className="text-sm font-medium">{getGenerationTypeLabel(type)}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Generate Button */}
+          {/* Update Button */}
           <div className="flex items-end">
             <button
-              onClick={handleGenerate}
-              disabled={selectedDocuments.size < 5 || isGenerating}
+              onClick={handleUpdate}
+              disabled={!uploadedFile || selectedDocuments.size === 0 || isUpdating}
               className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {isGenerating ? (
+              {isUpdating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
+                  Updating...
                 </>
               ) : (
                 <>
                   <BookOpen className="w-4 h-4" />
-                  Generate {getGenerationTypeLabel(generationType)}
+                  Update Playbook
                 </>
               )}
             </button>
@@ -291,7 +325,7 @@ export default function PlaybooksPage() {
           <p className="text-muted-foreground max-w-md mx-auto">
             {searchQuery
               ? 'Try adjusting your search terms'
-              : 'Complete some interviews and share experiences to start creating playbooks.'
+              : 'Complete some interviews and share experiences to start updating playbooks.'
             }
           </p>
         </div>

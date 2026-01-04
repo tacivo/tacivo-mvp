@@ -357,7 +357,7 @@ Make it scannable - someone should be able to skim the headers and bolded parts 
 Begin creating the case study now. Tell the story well, extract the lessons clearly, and make it valuable for others facing similar challenges.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 4000,
       messages: [
         {
