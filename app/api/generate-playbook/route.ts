@@ -2,22 +2,71 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
+// Function to filter document content based on selected sections
+function filterDocumentContent(content: string, contentSections: string[]): string {
+  if (!contentSections || contentSections.includes('all-content')) {
+    // Limit each document to ~5k characters to prevent token overflow
+    return content.length > 5000 ? content.substring(0, 5000) + '...' : content;
+  }
+
+  const lines = content.split('\n');
+  const filteredLines: string[] = [];
+  let currentSection = '';
+  let includeSection = false;
+
+  for (const line of lines) {
+    // Check for section headers
+    if (line.startsWith('## ')) {
+      const sectionTitle = line.substring(3).toLowerCase().trim();
+      currentSection = sectionTitle;
+      includeSection = false;
+
+      // Check if this section should be included
+      if (contentSections.includes('executive-summary') && sectionTitle.includes('executive summary')) {
+        includeSection = true;
+      } else if (contentSections.includes('key-decisions') && (sectionTitle.includes('key decisions') || sectionTitle.includes('decisions & actions'))) {
+        includeSection = true;
+      } else if (contentSections.includes('challenges-pivots') && (sectionTitle.includes('challenges') || sectionTitle.includes('pivots'))) {
+        includeSection = true;
+      } else if (contentSections.includes('results-outcomes') && (sectionTitle.includes('results') || sectionTitle.includes('outcomes'))) {
+        includeSection = true;
+      } else if (contentSections.includes('lessons-learned') && sectionTitle.includes('lessons learned')) {
+        includeSection = true;
+      }
+
+      if (includeSection) {
+        filteredLines.push(line);
+      }
+    } else if (line.startsWith('# ') && contentSections.includes('executive-summary') && line.substring(2).toLowerCase().includes('executive summary')) {
+      // Handle main headers that might be executive summary
+      includeSection = true;
+      filteredLines.push(line);
+    } else if (includeSection) {
+      filteredLines.push(line);
+    }
+  }
+
+  const filteredContent = filteredLines.join('\n');
+  // Limit to ~5k characters even after filtering
+  return filteredContent.length > 5000 ? filteredContent.substring(0, 5000) + '...' : filteredContent;
+}
+
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
   try {
-    const { documentIds, type } = await req.json();
+    const { documentIds, type, contentSections } = await req.json();
 
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length < 5) {
+    if (!documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
       return NextResponse.json(
-        { error: 'At least 5 documents must be selected' },
+        { error: 'At least 2 documents must be selected' },
         { status: 400 }
       );
     }
 
-    if (!type || !['playbook', 'guide', 'best-practices', 'company-document'].includes(type)) {
+    if (!type || !['sales-playbook', 'customer-success-guide', 'operational-procedures', 'strategic-planning-document'].includes(type)) {
       return NextResponse.json(
         { error: 'Invalid generation type' },
         { status: 400 }
@@ -58,9 +107,9 @@ export async function POST(req: NextRequest) {
     // Check if documents have content and filter out empty ones
     const validDocuments = documents.filter((doc: any) => doc.content && doc.content.trim().length > 0);
 
-    if (validDocuments.length < 5) {
+    if (validDocuments.length < 2) {
       return NextResponse.json(
-        { error: `Only ${validDocuments.length} documents have content. Need at least 5 documents with content.` },
+        { error: `Only ${validDocuments.length} documents have content. Need at least 2 documents with content.` },
         { status: 400 }
       );
     }
@@ -68,15 +117,15 @@ export async function POST(req: NextRequest) {
     // Combine all document content with length limits
     const combinedContent = validDocuments.map((doc: any) => {
       const profile = doc.profiles;
-      // Limit each document to ~5k characters to prevent token overflow
-      const content = doc.content.length > 5000 ? doc.content.substring(0, 5000) + '...' : doc.content;
+      // Filter content based on selected sections
+      const filteredContent = filterDocumentContent(doc.content, contentSections || ['all-content']);
 
       return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
 Content:
-${content}
+${filteredContent}
 
 ---`;
     }).join('\n\n');
@@ -86,87 +135,99 @@ ${content}
     // Create generation prompt based on type
     let prompt = '';
     switch (type) {
-      case 'playbook':
-        prompt = `You are creating a comprehensive playbook by synthesizing insights from ${validDocuments.length} different experiences and best practices.
+      case 'sales-playbook':
+        prompt = `You are creating a comprehensive sales playbook by synthesizing insights from ${validDocuments.length} different experiences and best practices.
 
 SOURCE DOCUMENTS:
 ${combinedContent}
 
 === YOUR TASK ===
 
-Create a detailed playbook that combines the best practices, methodologies, and insights from all these experiences. The playbook should:
+Create a detailed sales playbook that combines the best practices, methodologies, and insights from all these experiences. The playbook should:
 
 1. Identify common patterns and themes across all experiences
-2. Create a step-by-step framework that incorporates the most effective approaches
-3. Include decision trees for different scenarios
-4. Provide templates and checklists
-5. Address potential challenges and mitigation strategies
+2. Create a step-by-step sales framework that incorporates the most effective approaches
+3. Include decision trees for different sales scenarios
+4. Provide templates and checklists for sales activities
+5. Address potential challenges and mitigation strategies in sales processes
 
-TARGET AUDIENCE: Teams and individuals who need a complete operational guide.
+TARGET AUDIENCE: Sales teams and individuals who need a complete sales methodology guide.
 
 LENGTH: 5-8 pages. Be thorough but practical.
 
-=== PLAYBOOK STRUCTURE ===
+=== SALES PLAYBOOK STRUCTURE ===
 
-# [Generated Title Based on Common Themes]
+# Sales Playbook
 
-*Comprehensive playbook synthesized from ${validDocuments.length} expert experiences*
+*Comprehensive sales methodology synthesized from ${validDocuments.length} expert experiences*
 
 ---
 
 ## Executive Summary
 
-[Overview of the playbook's scope and key insights]
+[Overview of the sales playbook's scope and key insights]
 
-## Core Framework
+## Core Sales Framework
 
-[Step-by-step methodology combining best approaches]
+[Step-by-step sales methodology combining best approaches from all experiences]
 
-## Key Patterns & Best Practices
+## Prospecting & Lead Generation
 
-[Common themes and proven strategies]
+[Effective strategies for finding and qualifying prospects]
+
+## Qualification & Discovery
+
+[How to identify real opportunities and understand customer needs]
+
+## Presentation & Demonstration
+
+[Best practices for presenting solutions and handling objections]
+
+## Negotiation & Closing
+
+[Techniques for successful deal closure]
 
 ## Decision Framework
 
-[When to use different approaches]
+[When to use different sales approaches based on deal characteristics]
 
 ## Implementation Templates
 
-[Checklists, templates, and tools]
+[Checklists, email templates, call scripts, and sales tools]
 
-## Common Challenges & Solutions
+## Common Sales Challenges & Solutions
 
-[Problems encountered and how to address them]
+[Problems encountered and how to address them in sales]
 
 ## Case Studies
 
-[Anonymized examples from the source experiences]
+[Anonymized examples from the source experiences applied to sales]
 
 ## Resources & Next Steps
 
-[Additional tools and continuous improvement]
+[Additional sales tools and continuous improvement]
 
 ---
-*Generated from experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
+*Generated from sales experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
         break;
 
-      case 'guide':
-        prompt = `You are creating a practical guide by synthesizing insights from ${validDocuments.length} different experiences.
+      case 'customer-success-guide':
+        prompt = `You are creating a customer success guide by synthesizing insights from ${validDocuments.length} different experiences.
 
 SOURCE DOCUMENTS:
 ${combinedContent}
 
 === YOUR TASK ===
 
-Create a 3-5 page practical guide that captures the most effective approaches and insights from all these experiences.
+Create a 4-6 page customer success guide that captures the most effective approaches and insights from all these experiences.
 
-TARGET AUDIENCE: Practitioners who need actionable guidance.
+TARGET AUDIENCE: Customer success teams who need actionable guidance for managing and growing customer relationships.
 
-LENGTH: 3-5 pages maximum.
+LENGTH: 4-6 pages maximum. Be practical and focused on outcomes.
 
-=== GUIDE STRUCTURE ===
+=== CUSTOMER SUCCESS GUIDE STRUCTURE ===
 
-# Practical Guide: [Generated Title]
+# Customer Success Guide
 
 *Based on insights from ${validDocuments.length} expert experiences*
 
@@ -174,45 +235,65 @@ LENGTH: 3-5 pages maximum.
 
 ## Overview
 
-[What this guide covers and why it matters]
+[What this guide covers and why customer success matters]
 
-## Core Methodology
+## Customer Journey Mapping
 
-[Step-by-step approach combining best practices]
+[Understanding the customer's lifecycle and touchpoints]
 
-## Key Insights & Patterns
+## Onboarding Excellence
 
-[Most important lessons learned]
+[Best practices for successful customer onboarding]
 
-## Actionable Recommendations
+## Adoption & Engagement
 
-[Specific steps to implement]
+[Strategies to drive product adoption and engagement]
 
-## Common Pitfalls to Avoid
+## Health Scoring & Monitoring
 
-[What to watch out for]
+[How to track customer health and identify at-risk accounts]
+
+## Expansion & Growth
+
+[Techniques for identifying and executing expansion opportunities]
+
+## Retention Strategies
+
+[Proactive approaches to prevent churn]
+
+## Customer Communication
+
+[Effective communication strategies and cadences]
+
+## Success Metrics & KPIs
+
+[Key metrics to track and measure success]
+
+## Tools & Templates
+
+[Practical tools for customer success teams]
 
 ---
-*Compiled from experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
+*Compiled from customer success experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
         break;
 
-      case 'best-practices':
-        prompt = `You are creating a best practices document by synthesizing insights from ${validDocuments.length} different experiences.
-
+      case 'operational-procedures':
+        prompt = `You are creating operational procedures by synthesizing insights from ${validDocuments.length} different experiences.
+        
 SOURCE DOCUMENTS:
 ${combinedContent}
 
 === YOUR TASK ===
 
-Create a comprehensive best practices guide that distills the most effective approaches from all these experiences.
+Create a comprehensive operational procedures document that distills the most effective approaches from all these experiences.
 
-TARGET AUDIENCE: Teams looking to establish standards and improve their processes.
+TARGET AUDIENCE: Operations teams looking to establish standards and improve their processes.
 
-LENGTH: 4-6 pages.
+LENGTH: 6-8 pages.
 
-=== BEST PRACTICES STRUCTURE ===
+=== OPERATIONAL PROCEDURES STRUCTURE ===
 
-# Best Practices Guide
+# Standard Operating Procedures
 
 *Distilled from ${validDocuments.length} expert experiences*
 
@@ -220,45 +301,65 @@ LENGTH: 4-6 pages.
 
 ## Introduction
 
-[Context and importance]
+[Context and importance of standardized procedures]
 
-## Essential Best Practices
+## Core Operational Framework
 
-[Core principles and standards]
+[Overall approach to operations management]
 
-## Implementation Guidelines
+## Process Documentation
 
-[How to apply these practices]
+[How to document and maintain operational processes]
 
-## Success Metrics
+## Quality Control & Assurance
 
-[How to measure effectiveness]
+[Standards and procedures for maintaining quality]
 
-## Common Mistakes to Avoid
+## Performance Monitoring
 
-[What not to do]
+[Key metrics and monitoring procedures]
+
+## Issue Resolution Protocols
+
+[Standardized approaches to handling operational issues]
+
+## Training & Onboarding
+
+[Procedures for training new team members]
+
+## Continuous Improvement
+
+[Processes for ongoing optimization]
+
+## Risk Management
+
+[Procedures for identifying and mitigating operational risks]
+
+## Compliance & Auditing
+
+[Procedures for ensuring compliance and conducting audits]
 
 ---
-*Based on experiences by: ${documents.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
+*Based on operational experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
         break;
 
-      case 'company-document':
-        prompt = `You are creating a company-standard document by synthesizing insights from ${validDocuments.length} different experiences.
+      case 'strategic-planning-document':
+        prompt = `You are creating a strategic planning document by synthesizing insights from ${validDocuments.length} different experiences.
 
 SOURCE DOCUMENTS:
 ${combinedContent}
 
 === YOUR TASK ===
 
-Create a standardized company document that establishes official guidelines based on the collective experience.
+Create a strategic planning framework that establishes guidelines based on the collective experience from all these cases.
 
-TARGET AUDIENCE: Company-wide standard operating procedures.
+TARGET AUDIENCE: Leadership teams and strategic planners.
 
 LENGTH: 6-10 pages.
 
-=== COMPANY DOCUMENT STRUCTURE ===
+=== STRATEGIC PLANNING DOCUMENT STRUCTURE ===
 
-# [Company] Standard Operating Procedures
+# Strategic Planning Framework
 
 *Official guidelines based on ${validDocuments.length} expert experiences*
 
@@ -266,30 +367,50 @@ LENGTH: 6-10 pages.
 
 ## Purpose & Scope
 
-[What this document covers]
+[What this strategic planning framework covers]
 
-## Standard Processes
+## Strategic Planning Process
 
-[Official procedures and workflows]
+[Step-by-step approach to strategic planning]
 
-## Quality Standards
+## Environmental Analysis
 
-[Requirements and expectations]
+[Methods for analyzing internal and external environments]
 
-## Roles & Responsibilities
+## Goal Setting & Objectives
 
-[Who does what]
+[Frameworks for setting strategic goals and objectives]
 
-## Compliance & Auditing
+## Strategy Development
 
-[How to ensure adherence]
+[Approaches to developing effective strategies]
 
-## Training & Development
+## Implementation Planning
 
-[How to maintain standards]
+[How to create actionable implementation plans]
+
+## Resource Allocation
+
+[Strategic approaches to resource planning]
+
+## Risk Assessment & Mitigation
+
+[Identifying and managing strategic risks]
+
+## Performance Measurement
+
+[Metrics and methods for tracking strategic success]
+
+## Review & Adaptation
+
+[Processes for reviewing and adjusting strategies]
+
+## Communication & Alignment
+
+[Ensuring organizational alignment with strategic plans]
 
 ---
-*Approved based on experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
+*Approved based on strategic experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
         break;
     }
 

@@ -22,7 +22,9 @@ type AccessibleDocument = {
   }
 }
 
-type GenerationType = 'playbook' | 'guide' | 'best-practices' | 'company-document'
+type GenerationType = 'sales-playbook' | 'customer-success-guide' | 'operational-procedures' | 'strategic-planning-document'
+
+type ContentSection = 'executive-summary' | 'key-decisions' | 'challenges-pivots' | 'results-outcomes' | 'lessons-learned' | 'all-content'
 
 export default function PlaybooksPage() {
   const router = useRouter()
@@ -30,7 +32,8 @@ export default function PlaybooksPage() {
   const [documents, setDocuments] = useState<AccessibleDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
-  const [generationType, setGenerationType] = useState<GenerationType>('playbook')
+  const [generationType, setGenerationType] = useState<GenerationType>('sales-playbook')
+  const [selectedContentSections, setSelectedContentSections] = useState<Set<ContentSection>>(new Set(['all-content']))
   const [isGenerating, setIsGenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -114,8 +117,32 @@ export default function PlaybooksPage() {
     }
   }
 
+  const handleContentSectionToggle = (section: ContentSection) => {
+    const newSelected = new Set(selectedContentSections)
+    if (section === 'all-content') {
+      if (newSelected.has('all-content')) {
+        newSelected.clear()
+      } else {
+        newSelected.clear()
+        newSelected.add('all-content')
+      }
+    } else {
+      newSelected.delete('all-content')
+      if (newSelected.has(section)) {
+        newSelected.delete(section)
+      } else {
+        newSelected.add(section)
+      }
+      // If no sections selected, default to all-content
+      if (newSelected.size === 0) {
+        newSelected.add('all-content')
+      }
+    }
+    setSelectedContentSections(newSelected)
+  }
+
   const handleGenerate = async () => {
-    if (selectedDocuments.size < 5) return
+    if (selectedDocuments.size < 2) return
 
     setIsGenerating(true)
     try {
@@ -127,6 +154,7 @@ export default function PlaybooksPage() {
         body: JSON.stringify({
           documentIds: Array.from(selectedDocuments),
           type: generationType,
+          contentSections: Array.from(selectedContentSections),
         }),
       })
 
@@ -160,19 +188,19 @@ export default function PlaybooksPage() {
 
   const getGenerationTypeIcon = (type: GenerationType) => {
     switch (type) {
-      case 'playbook': return <BookOpen className="w-5 h-5" />
-      case 'guide': return <FileText className="w-5 h-5" />
-      case 'best-practices': return <FileCheck className="w-5 h-5" />
-      case 'company-document': return <Building className="w-5 h-5" />
+      case 'sales-playbook': return <BookOpen className="w-5 h-5" />
+      case 'customer-success-guide': return <FileText className="w-5 h-5" />
+      case 'operational-procedures': return <FileCheck className="w-5 h-5" />
+      case 'strategic-planning-document': return <Building className="w-5 h-5" />
     }
   }
 
   const getGenerationTypeLabel = (type: GenerationType) => {
     switch (type) {
-      case 'playbook': return 'Playbook'
-      case 'guide': return 'Guide'
-      case 'best-practices': return 'Best Practices'
-      case 'company-document': return 'Company Document'
+      case 'sales-playbook': return 'Sales Playbook'
+      case 'customer-success-guide': return 'Customer Success Guide'
+      case 'operational-procedures': return 'Operational Procedures'
+      case 'strategic-planning-document': return 'Strategic Planning Document'
     }
   }
 
@@ -202,13 +230,8 @@ export default function PlaybooksPage() {
             <h3 className="text-lg font-semibold text-foreground mb-2">Selected Experiences</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {selectedDocuments.size} of {filteredDocuments.length} experiences selected
-              {selectedDocuments.size < 5 && (
-                <span className="text-orange-600 ml-2">
-                  (minimum 5 required)
-                </span>
-              )}
             </p>
-            {selectedDocuments.size >= 5 && (
+            {selectedDocuments.size >= 2 && (
               <div className="flex items-center gap-2 text-green-600 text-sm">
                 <CheckCircle className="w-4 h-4" />
                 Ready to generate
@@ -220,7 +243,7 @@ export default function PlaybooksPage() {
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-foreground mb-2">Generation Type</h3>
             <div className="grid grid-cols-2 gap-2">
-              {(['playbook', 'guide', 'best-practices', 'company-document'] as GenerationType[]).map((type) => (
+              {(['sales-playbook', 'customer-success-guide', 'operational-procedures', 'strategic-planning-document'] as GenerationType[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => setGenerationType(type)}
@@ -239,11 +262,41 @@ export default function PlaybooksPage() {
             </div>
           </div>
 
+          {/* Content Selection */}
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Content to Include</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Select which sections from the experiences to include in the generation.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: 'all-content' as ContentSection, label: 'All Content', description: 'Include everything' },
+                { key: 'executive-summary' as ContentSection, label: 'Executive Summary', description: 'Brief overviews' },
+                { key: 'key-decisions' as ContentSection, label: 'Key Decisions', description: 'Important choices made' },
+                { key: 'challenges-pivots' as ContentSection, label: 'Challenges & Pivots', description: 'Problems and adaptations' },
+                { key: 'results-outcomes' as ContentSection, label: 'Results & Outcomes', description: 'What was achieved' },
+                { key: 'lessons-learned' as ContentSection, label: 'Lessons Learned', description: 'Key takeaways' },
+              ].map((section) => (
+                <button
+                  key={section.key}
+                  onClick={() => handleContentSectionToggle(section.key)}
+                  className={`p-2 rounded-lg border text-left transition-all text-xs ${
+                    selectedContentSections.has(section.key)
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-border hover:border-accent/50'
+                  }`}
+                >
+                  <div className="font-medium">{section.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Generate Button */}
           <div className="flex items-end">
             <button
               onClick={handleGenerate}
-              disabled={selectedDocuments.size < 5 || isGenerating}
+              disabled={selectedDocuments.size < 2 || isGenerating}
               className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isGenerating ? (
