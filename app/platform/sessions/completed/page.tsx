@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, Eye, User } from 'lucide-react'
+import { CheckCircle, Eye, User, Globe, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getUserInterviews, getUserDocuments } from '@/lib/supabase/interviews'
 import { Interview, Document, Profile } from '@/types/database.types'
@@ -110,9 +110,17 @@ export default function CompletedSessionsPage() {
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent">
                         Completed
                       </span>
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                        {interview.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                      </span>
+                      {document?.is_shared ? (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          Shared
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          Private
+                        </span>
+                      )}
                       {interview.function_area && (
                         <span className="px-2 py-0.5 rounded text-xs font-medium bg-secondary text-foreground border border-border">
                           {interview.function_area}

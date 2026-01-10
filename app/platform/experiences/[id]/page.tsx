@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase, Globe, Lock, User, Calendar } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
@@ -19,6 +19,8 @@ export default function DocumentViewPage() {
   const documentId = params.id as string;
 
   const [document, setDocument] = useState<Document | null>(null);
+  const [interview, setInterview] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -132,6 +134,28 @@ export default function DocumentViewPage() {
 
       const doc = data as unknown as Document;
       setDocument(doc);
+
+      // Fetch interview data for function_area
+      if ((doc as any).interview_id) {
+        const { data: interviewData } = await supabase
+          .from('interviews')
+          .select('function_area')
+          .eq('id', (doc as any).interview_id)
+          .single();
+
+        setInterview(interviewData);
+      }
+
+      // Fetch profile data for owner name
+      if ((doc as any).user_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', (doc as any).user_id)
+          .single();
+
+        setProfile(profileData);
+      }
 
       // Parse BlockNote content if format is blocknote
       if (doc.format === 'blocknote' && doc.content) {
@@ -480,24 +504,42 @@ export default function DocumentViewPage() {
                 {document.title}
               </h1>
             )}
-            <div className="flex items-center gap-4 px-2 text-sm text-gray-500">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
-                {document.document_type === 'case-study' ? '📋 Case Study' : '📚 Best Practices'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+            <div className="flex items-center gap-3 px-2 text-sm">
+              {/* Share/Private Badge */}
+              {(document as any).is_shared ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-50 text-green-700 border border-green-200 font-medium">
+                  <Globe className="w-3.5 h-3.5" />
+                  Shared
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-600 font-medium">
+                  <Lock className="w-3.5 h-3.5" />
+                  Private
+                </span>
+              )}
+
+              {/* Function Area */}
+              {interview?.function_area && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-medium capitalize">
+                  {interview.function_area}
+                </span>
+              )}
+
+              {/* Date */}
+              <span className="flex items-center gap-1.5 text-gray-500">
+                <Calendar className="w-4 h-4" />
                 {new Date(document.created_at).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric'
                 })}
               </span>
-              {(document as any).is_shared && (
-                <span className="flex items-center gap-1.5 text-blue-600">
-                  <Share2 className="w-4 h-4" />
-                  Shared with team
+
+              {/* Owner */}
+              {profile?.full_name && (
+                <span className="flex items-center gap-1.5 text-gray-500">
+                  <User className="w-4 h-4" />
+                  {profile.full_name}
                 </span>
               )}
             </div>
