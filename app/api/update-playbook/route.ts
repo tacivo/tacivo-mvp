@@ -8,23 +8,19 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    const formData = await req.formData();
-    const playbookFile = formData.get('playbook') as File;
-    const documentIdsString = formData.get('documentIds') as string;
+    const body = await req.json();
+    const { playbookId, documentIds, newDocumentIds, additionalContext, userId } = body;
 
-    if (!playbookFile) {
+    if (!playbookId) {
       return NextResponse.json(
-        { error: 'No playbook file provided' },
+        { error: 'Playbook ID is required' },
         { status: 400 }
       );
     }
 
-    let documentIds: string[];
-    try {
-      documentIds = JSON.parse(documentIdsString);
-    } catch {
+    if (!userId) {
       return NextResponse.json(
-        { error: 'Invalid document IDs' },
+        { error: 'User ID is required' },
         { status: 400 }
       );
     }
@@ -38,71 +34,97 @@ export async function POST(req: NextRequest) {
 
     const supabase = supabaseAdmin;
 
-    // Fetch all selected documents
-    const { data: documents, error } = await supabase
-      .from('documents')
-      .select(`
-        *,
-        profiles:user_id (
-          full_name,
-          role,
-          years_of_experience
-        )
-      `)
-      .in('id', documentIds);
+    // Fetch the existing playbook
+    const { data: playbook, error: playbookError } = await supabase
+      .from('playbooks')
+      .select('*')
+      .eq('id', playbookId)
+      .single();
 
-    if (error) {
-      console.error('Database error fetching documents:', error);
-      throw error;
-    }
-
-    if (!documents || documents.length === 0) {
+    if (playbookError || !playbook) {
+      console.error('Error fetching playbook:', playbookError);
       return NextResponse.json(
-        { error: 'No documents found. Please ensure you have completed interviews and generated documents.' },
+        { error: 'Playbook not found' },
         { status: 404 }
       );
     }
 
-    // Check if documents have content and filter out empty ones
-    const validDocuments = documents.filter((doc: any) => doc.content && doc.content.trim().length > 0);
+    // Cast to any to avoid TypeScript errors with Supabase types
+    const playbookData = playbook as any;
 
-    if (validDocuments.length === 0) {
+    // Verify ownership
+    if (playbookData.user_id !== userId) {
       return NextResponse.json(
-        { error: 'Selected documents have no content.' },
-        { status: 400 }
+        { error: 'Unauthorized to update this playbook' },
+        { status: 403 }
       );
     }
 
-    // Extract text from uploaded playbook file
-    let existingPlaybookContent = '';
-    try {
-      if (playbookFile.type === 'text/plain') {
-        existingPlaybookContent = await playbookFile.text();
-      } else if (playbookFile.name.endsWith('.txt')) {
-        existingPlaybookContent = await playbookFile.text();
-      } else {
-        // For PDF/DOCX, we'd need additional libraries like pdf-parse or mammoth
-        // For now, return an error
+    // If there are no new documents and no additional context, return early
+    if ((!newDocumentIds || newDocumentIds.length === 0) && !additionalContext) {
+      // Just update the document_ids array
+      const { error: updateError } = await supabase
+        .from('playbooks')
+        .update({
+          document_ids: documentIds,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', playbookId);
+
+      if (updateError) {
+        console.error('Error updating playbook:', updateError);
+        throw updateError;
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Playbook document list updated'
+      });
+    }
+
+    // Fetch new documents if any
+    let newDocumentsContent = '';
+    if (newDocumentIds && newDocumentIds.length > 0) {
+      const { data: newDocuments, error: docsError } = await supabase
+        .from('documents')
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            role,
+            years_of_experience
+          )
+        `)
+        .in('id', newDocumentIds);
+
+      if (docsError) {
+        console.error('Database error fetching documents:', docsError);
+        throw docsError;
+      }
+
+      if (!newDocuments || newDocuments.length === 0) {
         return NextResponse.json(
-          { error: 'File format not supported. Please upload a TXT file for now.' },
+          { error: 'No new documents found' },
+          { status: 404 }
+        );
+      }
+
+      // Filter valid documents and prepare content
+      const validDocuments = newDocuments.filter((doc: any) => doc.content && doc.content.trim().length > 0);
+
+      if (validDocuments.length === 0) {
+        return NextResponse.json(
+          { error: 'Selected new documents have no content' },
           { status: 400 }
         );
       }
-    } catch (fileError) {
-      console.error('Error reading file:', fileError);
-      return NextResponse.json(
-        { error: 'Failed to read uploaded file' },
-        { status: 400 }
-      );
-    }
 
-    // Combine new document content with length limits
-    const newExperiencesContent = validDocuments.map((doc: any) => {
-      const profile = doc.profiles;
-      // Limit each document to ~3k characters to prevent token overflow
-      const content = doc.content.length > 3000 ? doc.content.substring(0, 3000) + '...' : doc.content;
+      newDocumentsContent = validDocuments.map((doc: any) => {
+        const profile = doc.profiles;
+        // Limit each document to ~3k characters to prevent token overflow
+        const content = doc.content.length > 3000 ? doc.content.substring(0, 3000) + '...' : doc.content;
 
-      return `=== ${doc.title} ===
+        return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
@@ -110,43 +132,67 @@ Content:
 ${content}
 
 ---`;
-    }).join('\n\n');
+      }).join('\n\n');
+    }
 
-    console.log(`Updating playbook with ${validDocuments.length} new experiences. Existing content length: ${existingPlaybookContent.length}, New content length: ${newExperiencesContent.length}`);
+    console.log(`Updating playbook "${playbookData.title}" with ${newDocumentIds?.length || 0} new experiences.`);
 
     // Create update prompt
-    const prompt = `You are updating an existing playbook by incorporating new experiences and insights.
+    let prompt = `You are updating an existing playbook by incorporating new information.
 
 EXISTING PLAYBOOK:
-${existingPlaybookContent}
+Title: ${playbookData.title}
+Type: ${playbookData.type}
 
-NEW EXPERIENCES TO INCORPORATE:
-${newExperiencesContent}
+Content:
+${playbookData.content}
 
 === YOUR TASK ===
 
-Update the existing playbook by integrating the new experiences. You should:
+Update the existing playbook with the following:
+`;
 
-1. Analyze the new experiences for fresh insights, patterns, and best practices
-2. Update existing sections with new information where relevant
-3. Add new sections if the new experiences introduce significant new concepts
-4. Ensure the updated playbook maintains its structure and flow
-5. Highlight where new experiences contradict or enhance existing guidance
-6. Update any examples, case studies, or recommendations based on the new data
+    if (newDocumentsContent) {
+      prompt += `
+NEW EXPERIENCES TO INCORPORATE:
+${newDocumentsContent}
 
-PRESERVE THE EXISTING STRUCTURE as much as possible, but enhance it with the new insights.
+Analyze these new experiences for fresh insights, patterns, and best practices.
+`;
+    }
 
-TARGET AUDIENCE: The same audience as the original playbook.
+    if (additionalContext) {
+      prompt += `
+ADDITIONAL CONTEXT/INSTRUCTIONS:
+${additionalContext}
+
+Follow these specific instructions when updating the playbook.
+`;
+    }
+
+    prompt += `
+When updating the playbook:
+
+1. ${newDocumentsContent ? 'Integrate the new experiences into existing sections where relevant' : 'Apply the additional context to enhance the content'}
+2. ${newDocumentsContent ? 'Add new sections if the new experiences introduce significant new concepts' : 'Update sections based on the provided context'}
+3. Ensure the updated playbook maintains its structure and flow
+4. ${newDocumentsContent ? 'Highlight where new experiences enhance or contradict existing guidance' : 'Ensure all updates align with the provided context'}
+5. Update any examples, case studies, or recommendations based on the new information
+6. Maintain the same professional tone and format
+
+PRESERVE THE EXISTING STRUCTURE as much as possible, but enhance it with the new information.
+
+TARGET AUDIENCE: The same audience as the original playbook (${playbookData.type}).
 
 LENGTH: Maintain similar length to original, expanded only where new content adds significant value.
 
 === UPDATED PLAYBOOK ===
 
-Return the complete updated playbook with all original content integrated with the new experiences.`;
+Return ONLY the complete updated playbook content (not the title, just the content). Maintain the same formatting style as the original.`;
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 8000,
+      max_tokens: 16000,
       temperature: 0.7,
       messages: [
         {
@@ -160,10 +206,26 @@ Return the complete updated playbook with all original content integrated with t
 
     console.log(`Successfully updated playbook. New length: ${updatedContent.length} characters`);
 
+    // Update the playbook in the database
+    const { error: updateError } = await supabase
+      .from('playbooks')
+      .update({
+        content: updatedContent,
+        document_ids: documentIds,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', playbookId);
+
+    if (updateError) {
+      console.error('Error updating playbook in database:', updateError);
+      throw updateError;
+    }
+
     return NextResponse.json({
-      content: updatedContent,
+      success: true,
+      playbookId: playbookId,
       updatedAt: new Date().toISOString(),
-      newExperiencesAdded: validDocuments.length
+      newExperiencesAdded: newDocumentIds?.length || 0
     });
 
   } catch (error) {
@@ -179,7 +241,7 @@ Return the complete updated playbook with all original content integrated with t
       }
       if (error.message.includes('token')) {
         return NextResponse.json(
-          { error: 'Content too long. Try selecting fewer documents or a shorter playbook.' },
+          { error: 'Content too long. Try selecting fewer documents or provide less context.' },
           { status: 400 }
         );
       }
