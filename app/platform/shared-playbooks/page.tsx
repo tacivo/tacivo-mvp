@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpenIcon, Calendar, User, FileText, Globe, Lock, Trash2, Share2, X } from 'lucide-react'
+import { BookOpenIcon, Calendar, User, FileText, Globe, Lock, Trash2, Share2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Playbook } from '@/types/database.types'
 
@@ -19,7 +19,6 @@ export default function SharedPlaybooksPage() {
   const [playbooks, setPlaybooks] = useState<PlaybookWithProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookWithProfile | null>(null)
 
   useEffect(() => {
     loadPlaybooks()
@@ -102,7 +101,9 @@ export default function SharedPlaybooksPage() {
     }
   }
 
-  const handleDelete = async (playbook: PlaybookWithProfile) => {
+  const handleDelete = async (playbook: PlaybookWithProfile, e: React.MouseEvent) => {
+    e.stopPropagation()
+
     if (!confirm(`Are you sure you want to delete "${playbook.title}"?`)) return
 
     try {
@@ -115,7 +116,6 @@ export default function SharedPlaybooksPage() {
 
       // Reload playbooks
       await loadPlaybooks()
-      setSelectedPlaybook(null)
     } catch (error) {
       console.error('Error deleting playbook:', error)
       alert('Failed to delete playbook')
@@ -193,7 +193,7 @@ export default function SharedPlaybooksPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
               className="bg-card rounded-lg border border-border p-6 hover:shadow-md transition-all cursor-pointer group"
-              onClick={() => setSelectedPlaybook(playbook)}
+              onClick={() => router.push(`/platform/shared-playbooks/${playbook.id}`)}
             >
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
@@ -259,10 +259,7 @@ export default function SharedPlaybooksPage() {
                   {playbook.is_shared ? 'Unshare' : 'Share'}
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(playbook)
-                  }}
+                  onClick={(e) => handleDelete(playbook, e)}
                   className="px-3 py-2 text-sm border border-border rounded-lg hover:border-red-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -277,65 +274,6 @@ export default function SharedPlaybooksPage() {
       {playbooks.length > 0 && (
         <div className="mt-8 text-center text-sm text-muted-foreground">
           Showing {filteredPlaybooks.length} of {playbooks.length} playbook{playbooks.length !== 1 ? 's' : ''}
-        </div>
-      )}
-
-      {/* Playbook Viewer Modal */}
-      {selectedPlaybook && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedPlaybook(null)}
-        >
-          <div
-            className="bg-card rounded-xl border border-border max-w-4xl w-full max-h-[90vh] overflow-y-auto p-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="mb-6">
-              <div className="flex items-start justify-between mb-4">
-                <h2 className="text-2xl font-semibold text-foreground">{selectedPlaybook.title}</h2>
-                <button
-                  onClick={() => setSelectedPlaybook(null)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                <span className="px-2 py-1 bg-muted rounded">
-                  {getTypeLabel(selectedPlaybook.type)}
-                </span>
-                <span>{formatDate(selectedPlaybook.created_at)}</span>
-                <span>{selectedPlaybook.document_ids?.length || 0} sources</span>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-foreground">
-                {selectedPlaybook.content}
-              </pre>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="mt-8 pt-6 border-t border-border flex gap-4">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(selectedPlaybook.content)
-                  alert('Playbook content copied to clipboard!')
-                }}
-                className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
-              >
-                Copy Content
-              </button>
-              <button
-                onClick={() => setSelectedPlaybook(null)}
-                className="px-6 py-3 border border-border rounded-lg font-medium hover:border-accent/50 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

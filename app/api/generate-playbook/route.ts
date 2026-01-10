@@ -472,7 +472,7 @@ ${combinedContent}`,
             type,
             user_id: userId,
             organization_id: profileData?.organization_id || null,
-            is_shared: false,
+            is_shared: true, // Default to shared
             document_ids: documentIds,
             content_sections: ['all-content']
           })
