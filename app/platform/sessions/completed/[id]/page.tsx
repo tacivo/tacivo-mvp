@@ -146,7 +146,7 @@ export default function DocumentViewPage() {
     } catch (error) {
       console.error('Error loading document:', error);
       alert('Failed to load document');
-      router.push('/documents');
+      router.push('/platform/sessions/completed');
     } finally {
       setIsLoading(false);
     }
@@ -348,10 +348,10 @@ export default function DocumentViewPage() {
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-foreground mb-2">Document not found</h2>
           <button
-            onClick={() => router.push('/documents')}
+            onClick={() => router.push('/platform/sessions/completed')}
             className="text-book-cloth hover:underline"
           >
-            Back to documents
+            Back to completed sessions
           </button>
         </div>
       </div>
