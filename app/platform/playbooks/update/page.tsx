@@ -20,6 +20,9 @@ type AccessibleDocument = {
     full_name: string | null
     role: string | null
   }
+  interviews?: {
+    function_area: string | null
+  }
 }
 
 export default function UpdatePlaybooksPage() {
@@ -87,10 +90,12 @@ export default function UpdatePlaybooksPage() {
 
   const filteredDocuments = documents.filter(doc => {
     const searchLower = searchQuery.toLowerCase()
+    const interview = (doc as any).interviews
     return (
       doc.title.toLowerCase().includes(searchLower) ||
       doc.profiles?.full_name?.toLowerCase().includes(searchLower) ||
-      doc.profiles?.role?.toLowerCase().includes(searchLower)
+      doc.profiles?.role?.toLowerCase().includes(searchLower) ||
+      interview?.function_area?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -367,12 +372,14 @@ export default function UpdatePlaybooksPage() {
                 {doc.title}
               </h3>
 
-              {/* Type Badge */}
-              <div className="mb-3">
-                <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground">
-                  {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                </span>
-              </div>
+              {/* Function Area Badge */}
+              {(doc as any).interviews?.function_area && (
+                <div className="mb-3">
+                  <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground capitalize">
+                    {(doc as any).interviews.function_area}
+                  </span>
+                </div>
+              )}
 
               {/* Metadata */}
               <div className="space-y-2 text-sm text-muted-foreground">

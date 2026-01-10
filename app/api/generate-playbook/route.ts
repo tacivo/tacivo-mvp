@@ -2,65 +2,17 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
-// Function to filter document content based on selected sections
-function filterDocumentContent(content: string, contentSections: string[]): string {
-  if (!contentSections || contentSections.includes('all-content')) {
-    // Limit each document to ~5k characters to prevent token overflow
-    return content.length > 5000 ? content.substring(0, 5000) + '...' : content;
-  }
-
-  const lines = content.split('\n');
-  const filteredLines: string[] = [];
-  let includeSection = false;
-
-  for (const line of lines) {
-    // Check for section headers
-    if (line.startsWith('## ')) {
-      const sectionTitle = line.substring(3).toLowerCase().trim();
-      includeSection = false;
-
-      // Check if this section should be included
-      if (contentSections.includes('executive-summary') && sectionTitle.includes('executive summary')) {
-        includeSection = true;
-      } else if (contentSections.includes('key-decisions') && (sectionTitle.includes('key decisions') || sectionTitle.includes('decisions & actions'))) {
-        includeSection = true;
-      } else if (contentSections.includes('challenges-pivots') && (sectionTitle.includes('challenges') || sectionTitle.includes('pivots'))) {
-        includeSection = true;
-      } else if (contentSections.includes('results-outcomes') && (sectionTitle.includes('results') || sectionTitle.includes('outcomes'))) {
-        includeSection = true;
-      } else if (contentSections.includes('lessons-learned') && sectionTitle.includes('lessons learned')) {
-        includeSection = true;
-      }
-
-      if (includeSection) {
-        filteredLines.push(line);
-      }
-    } else if (line.startsWith('# ') && contentSections.includes('executive-summary') && line.substring(2).toLowerCase().includes('executive summary')) {
-      // Handle main headers that might be executive summary
-      includeSection = true;
-      filteredLines.push(line);
-    } else if (includeSection) {
-      filteredLines.push(line);
-    }
-  }
-
-  const filteredContent = filteredLines.join('\n');
-  // Limit to ~5k characters even after filtering
-  return filteredContent.length > 5000 ? filteredContent.substring(0, 5000) + '...' : filteredContent;
-}
-
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
   try {
-    const { documentIds, type, contentSections, title, savePlaybook, userId } = await req.json();
+    const { documentIds, type, title, savePlaybook, userId } = await req.json();
 
     console.log('Playbook generation request:', {
       documentCount: documentIds?.length,
       type,
-      hasSections: !!contentSections,
       hasTitle: !!title,
       shouldSave: savePlaybook,
       userId: userId
@@ -174,14 +126,14 @@ Skill Areas: ${aiSummary.skill_areas?.join(', ') || 'N/A'}
 
 ---`;
       } else {
-        // Fallback to filtered/truncated content
-        const filteredContent = filterDocumentContent(doc.content, contentSections || ['all-content']);
+        // Fallback to truncated content (AI summary not available)
+        const truncatedContent = doc.content.length > 5000 ? doc.content.substring(0, 5000) + '...' : doc.content;
         return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
 Content:
-${filteredContent}
+${truncatedContent}
 
 [Note: Using truncated content - AI summary not available]
 
@@ -522,7 +474,7 @@ ${combinedContent}`,
             organization_id: profileData?.organization_id || null,
             is_shared: false,
             document_ids: documentIds,
-            content_sections: contentSections || ['all-content']
+            content_sections: ['all-content']
           })
           .select()
           .single();

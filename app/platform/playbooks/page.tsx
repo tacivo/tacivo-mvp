@@ -20,11 +20,12 @@ type AccessibleDocument = {
     full_name: string | null
     role: string | null
   }
+  interviews?: {
+    function_area: string | null
+  }
 }
 
 type GenerationType = 'sales-playbook' | 'customer-success-guide' | 'operational-procedures' | 'strategic-planning-document'
-
-type ContentSection = 'executive-summary' | 'key-decisions' | 'challenges-pivots' | 'results-outcomes' | 'lessons-learned' | 'all-content'
 
 export default function PlaybooksPage() {
   const router = useRouter()
@@ -33,7 +34,6 @@ export default function PlaybooksPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
   const [generationType, setGenerationType] = useState<GenerationType>('sales-playbook')
-  const [selectedContentSections, setSelectedContentSections] = useState<Set<ContentSection>>(new Set(['all-content']))
   const [isGenerating, setIsGenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [playbookTitle, setPlaybookTitle] = useState('')
@@ -93,10 +93,12 @@ export default function PlaybooksPage() {
 
   const filteredDocuments = documents.filter(doc => {
     const searchLower = searchQuery.toLowerCase()
+    const interview = (doc as any).interviews
     return (
       doc.title.toLowerCase().includes(searchLower) ||
       doc.profiles?.full_name?.toLowerCase().includes(searchLower) ||
-      doc.profiles?.role?.toLowerCase().includes(searchLower)
+      doc.profiles?.role?.toLowerCase().includes(searchLower) ||
+      interview?.function_area?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -116,30 +118,6 @@ export default function PlaybooksPage() {
     } else {
       setSelectedDocuments(new Set(filteredDocuments.map(doc => doc.id)))
     }
-  }
-
-  const handleContentSectionToggle = (section: ContentSection) => {
-    const newSelected = new Set(selectedContentSections)
-    if (section === 'all-content') {
-      if (newSelected.has('all-content')) {
-        newSelected.clear()
-      } else {
-        newSelected.clear()
-        newSelected.add('all-content')
-      }
-    } else {
-      newSelected.delete('all-content')
-      if (newSelected.has(section)) {
-        newSelected.delete(section)
-      } else {
-        newSelected.add(section)
-      }
-      // If no sections selected, default to all-content
-      if (newSelected.size === 0) {
-        newSelected.add('all-content')
-      }
-    }
-    setSelectedContentSections(newSelected)
   }
 
   const handleGenerate = async () => {
@@ -163,7 +141,6 @@ export default function PlaybooksPage() {
         body: JSON.stringify({
           documentIds: Array.from(selectedDocuments),
           type: generationType,
-          contentSections: Array.from(selectedContentSections),
           title: playbookTitle || undefined,
           savePlaybook: true,
           userId: user.id,
@@ -297,36 +274,6 @@ export default function PlaybooksPage() {
             </div>
           </div>
 
-          {/* Content Selection */}
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground mb-2">Content to Include</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Select which sections from the experiences to include in the generation.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { key: 'all-content' as ContentSection, label: 'All Content', description: 'Include everything' },
-                { key: 'executive-summary' as ContentSection, label: 'Executive Summary', description: 'Brief overviews' },
-                { key: 'key-decisions' as ContentSection, label: 'Key Decisions', description: 'Important choices made' },
-                { key: 'challenges-pivots' as ContentSection, label: 'Challenges & Pivots', description: 'Problems and adaptations' },
-                { key: 'results-outcomes' as ContentSection, label: 'Results & Outcomes', description: 'What was achieved' },
-                { key: 'lessons-learned' as ContentSection, label: 'Lessons Learned', description: 'Key takeaways' },
-              ].map((section) => (
-                <button
-                  key={section.key}
-                  onClick={() => handleContentSectionToggle(section.key)}
-                  className={`p-2 rounded-lg border text-left transition-all text-xs ${
-                    selectedContentSections.has(section.key)
-                      ? 'border-accent bg-accent/10 text-accent'
-                      : 'border-border hover:border-accent/50'
-                  }`}
-                >
-                  <div className="font-medium">{section.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Generate Button */}
           <div className="flex items-end">
             <button
@@ -421,12 +368,14 @@ export default function PlaybooksPage() {
                 {doc.title}
               </h3>
 
-              {/* Type Badge */}
-              <div className="mb-3">
-                <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground">
-                  {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                </span>
-              </div>
+              {/* Function Area Badge */}
+              {(doc as any).interviews?.function_area && (
+                <div className="mb-3">
+                  <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground capitalize">
+                    {(doc as any).interviews.function_area}
+                  </span>
+                </div>
+              )}
 
               {/* Metadata */}
               <div className="space-y-2 text-sm text-muted-foreground">

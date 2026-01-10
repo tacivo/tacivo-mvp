@@ -310,6 +310,9 @@ export async function getSharedCompanyDocuments() {
         full_name,
         role,
         company
+      ),
+      interviews:interview_id (
+        function_area
       )
     `)
     .eq('is_shared', true)
@@ -388,6 +391,9 @@ export async function getAccessibleDocuments() {
         full_name,
         role,
         company
+      ),
+      interviews:interview_id (
+        function_area
       )
     `)
     .eq('is_shared', true)
@@ -405,6 +411,9 @@ export async function getAccessibleDocuments() {
         full_name,
         role,
         company
+      ),
+      interviews:interview_id (
+        function_area
       )
     `)
     .eq('user_id', user.id)
@@ -414,7 +423,7 @@ export async function getAccessibleDocuments() {
 
   // Combine and deduplicate (in case user's shared docs appear in both)
   const allDocs = [...(sharedDocs || []), ...(ownDocs || [])]
-  const uniqueDocs = allDocs.filter((doc: any, index: number, self: any[]) => 
+  const uniqueDocs = allDocs.filter((doc: any, index: number, self: any[]) =>
     self.findIndex((d: any) => d.id === doc.id) === index
   )
 
