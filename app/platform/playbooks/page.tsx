@@ -36,6 +36,7 @@ export default function PlaybooksPage() {
   const [selectedContentSections, setSelectedContentSections] = useState<Set<ContentSection>>(new Set(['all-content']))
   const [isGenerating, setIsGenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [playbookTitle, setPlaybookTitle] = useState('')
 
   useEffect(() => {
     loadData()
@@ -146,6 +147,14 @@ export default function PlaybooksPage() {
 
     setIsGenerating(true)
     try {
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert('You must be logged in to generate playbooks')
+        router.push('/login')
+        return
+      }
+
       const response = await fetch('/api/generate-playbook', {
         method: 'POST',
         headers: {
@@ -155,12 +164,11 @@ export default function PlaybooksPage() {
           documentIds: Array.from(selectedDocuments),
           type: generationType,
           contentSections: Array.from(selectedContentSections),
+          title: playbookTitle || undefined,
+          savePlaybook: true,
+          userId: user.id,
         }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to generate playbook')
-      }
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -169,13 +177,17 @@ export default function PlaybooksPage() {
 
       const result = await response.json()
 
-      // For now, just show the result in console - you might want to save it or show in a modal
-      console.log('Generated content:', result)
+      console.log('Generated playbook:', result)
 
       if (result.error) {
         alert(`Generation failed: ${result.error}`)
       } else {
-        alert('Playbook generated successfully! Check console for content.')
+        alert('Playbook generated and saved successfully!')
+        // Clear selections
+        setSelectedDocuments(new Set())
+        setPlaybookTitle('')
+        // Redirect to shared playbooks page to view the generated playbook
+        router.push('/platform/shared-playbooks')
       }
 
     } catch (error) {
@@ -216,10 +228,33 @@ export default function PlaybooksPage() {
     <div className="max-w-7xl mx-auto px-8 py-12">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Create Playbooks</h1>
+        <h1 className="text-4xl font-semibold text-foreground mb-2">Create Playbook</h1>
         <p className="text-muted-foreground">
           Synthesize patterns and best practices from multiple experiences to create comprehensive guides
         </p>
+      </div>
+
+      {/* Playbook Title Input */}
+      <div className="bg-card rounded-xl border border-border p-6 mb-8">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Playbook Details</h3>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="playbook-title" className="block text-sm font-medium text-foreground mb-2">
+              Playbook Title (optional)
+            </label>
+            <input
+              id="playbook-title"
+              type="text"
+              value={playbookTitle}
+              onChange={(e) => setPlaybookTitle(e.target.value)}
+              placeholder="e.g., Enterprise Sales Playbook Q1 2026"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              If not provided, a title will be generated automatically based on the playbook type and date
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Generation Controls */}

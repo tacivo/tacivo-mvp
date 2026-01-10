@@ -288,7 +288,7 @@ export default function DocumentViewPage() {
     try {
       // Get current blocks from editor
       const currentBlocks = editor.document;
-      
+
       const { error } = await (supabase
         .from('documents')
         .update as any)({
@@ -308,9 +308,20 @@ export default function DocumentViewPage() {
         content: JSON.stringify(currentBlocks),
         format: 'blocknote'
       });
-      
+
       setBlockNoteContent(currentBlocks);
       setIsEditing(false);
+
+      // Regenerate AI summary in the background (don't wait for it)
+      fetch('/api/generate-ai-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: document.id })
+      }).catch(err => {
+        console.warn('Failed to regenerate AI summary:', err);
+        // Don't show error to user - summary generation is background task
+      });
+
       alert('Document updated successfully!');
     } catch (error) {
       console.error('Error updating document:', error);

@@ -261,6 +261,88 @@ export interface Database {
           updated_at?: string
         }
       }
+      playbooks: {
+        Row: {
+          id: string
+          title: string
+          content: string
+          type: 'sales-playbook' | 'customer-success-guide' | 'operational-procedures' | 'strategic-planning-document'
+          user_id: string
+          organization_id: string | null
+          is_shared: boolean
+          document_ids: string[]
+          content_sections: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          content: string
+          type: 'sales-playbook' | 'customer-success-guide' | 'operational-procedures' | 'strategic-planning-document'
+          user_id: string
+          organization_id?: string | null
+          is_shared?: boolean
+          document_ids?: string[]
+          content_sections?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          content?: string
+          type?: 'sales-playbook' | 'customer-success-guide' | 'operational-procedures' | 'strategic-planning-document'
+          user_id?: string
+          organization_id?: string | null
+          is_shared?: boolean
+          document_ids?: string[]
+          content_sections?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      document_ai_summaries: {
+        Row: {
+          id: string
+          document_id: string
+          executive_summary: string
+          key_insights: string
+          tactical_details: string
+          challenges_solutions: string
+          topics: string[]
+          skill_areas: string[]
+          importance_scores: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          document_id: string
+          executive_summary: string
+          key_insights: string
+          tactical_details: string
+          challenges_solutions: string
+          topics?: string[]
+          skill_areas?: string[]
+          importance_scores?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          document_id?: string
+          executive_summary?: string
+          key_insights?: string
+          tactical_details?: string
+          challenges_solutions?: string
+          topics?: string[]
+          skill_areas?: string[]
+          importance_scores?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
       uploaded_files: {
         Row: {
           id: string
@@ -353,6 +435,7 @@ export type Interview = Database['public']['Tables']['interviews']['Row']
 export type InterviewMessage = Database['public']['Tables']['interview_messages']['Row']
 export type Document = Database['public']['Tables']['documents']['Row']
 export type UploadedFile = Database['public']['Tables']['uploaded_files']['Row']
+export type Playbook = Database['public']['Tables']['playbooks']['Row']
 
 export type InsertOrganization = Database['public']['Tables']['organizations']['Insert']
 export type InsertInvitation = Database['public']['Tables']['invitations']['Insert']
@@ -360,6 +443,7 @@ export type InsertAdminInvitation = Database['public']['Tables']['admin_invitati
 export type InsertInterview = Database['public']['Tables']['interviews']['Insert']
 export type InsertInterviewMessage = Database['public']['Tables']['interview_messages']['Insert']
 export type InsertDocument = Database['public']['Tables']['documents']['Insert']
+export type InsertPlaybook = Database['public']['Tables']['playbooks']['Insert']
 
 // Extended types with relations
 export interface ProfileWithOrganization extends Profile {

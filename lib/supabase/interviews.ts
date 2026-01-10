@@ -147,7 +147,7 @@ export async function getInterviewMessages(interviewId: string) {
 }
 
 /**
- * Create document
+ * Create document and trigger AI summary generation
  */
 export async function createDocument(data: InsertDocument) {
   const { data: document, error } = await supabase
@@ -157,7 +157,21 @@ export async function createDocument(data: InsertDocument) {
     .single()
 
   if (error) throw error
-  return document as Document
+
+  // Trigger AI summary generation in the background (don't wait for it)
+  const doc = document as Document;
+  if (doc) {
+    fetch('/api/generate-ai-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documentId: doc.id })
+    }).catch(err => {
+      console.warn('Failed to trigger AI summary generation:', err);
+      // Don't throw - summary generation is optional background task
+    });
+  }
+
+  return doc
 }
 
 /**

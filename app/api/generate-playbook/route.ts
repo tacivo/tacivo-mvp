@@ -11,14 +11,12 @@ function filterDocumentContent(content: string, contentSections: string[]): stri
 
   const lines = content.split('\n');
   const filteredLines: string[] = [];
-  let currentSection = '';
   let includeSection = false;
 
   for (const line of lines) {
     // Check for section headers
     if (line.startsWith('## ')) {
       const sectionTitle = line.substring(3).toLowerCase().trim();
-      currentSection = sectionTitle;
       includeSection = false;
 
       // Check if this section should be included
@@ -57,7 +55,16 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    const { documentIds, type, contentSections } = await req.json();
+    const { documentIds, type, contentSections, title, savePlaybook, userId } = await req.json();
+
+    console.log('Playbook generation request:', {
+      documentCount: documentIds?.length,
+      type,
+      hasSections: !!contentSections,
+      hasTitle: !!title,
+      shouldSave: savePlaybook,
+      userId: userId
+    });
 
     if (!documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
       return NextResponse.json(
@@ -75,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = supabaseAdmin;
 
-    // Fetch all selected documents
+    // Fetch all selected documents with their AI summaries
     const { data: documents, error } = await supabase
       .from('documents')
       .select(`
@@ -84,6 +91,14 @@ export async function POST(req: NextRequest) {
           full_name,
           role,
           years_of_experience
+        ),
+        document_ai_summaries (
+          executive_summary,
+          key_insights,
+          tactical_details,
+          challenges_solutions,
+          topics,
+          skill_areas
         )
       `)
       .in('id', documentIds);
@@ -94,7 +109,13 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Fetched ${documents?.length || 0} documents for IDs:`, documentIds);
-    console.log('Document details:', documents?.map((d: any) => ({ id: d.id, title: d.title, contentLength: d.content?.length || 0, hasContent: !!(d.content && d.content.trim()) })));
+    console.log('Document details:', documents?.map((d: any) => ({
+      id: d.id,
+      title: d.title,
+      contentLength: d.content?.length || 0,
+      hasContent: !!(d.content && d.content.trim()),
+      hasSummary: !!(d.document_ai_summaries && d.document_ai_summaries.length > 0)
+    })));
 
     if (!documents || documents.length === 0) {
       console.error(`No documents found for IDs:`, documentIds);
@@ -114,20 +135,58 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Combine all document content with length limits
+    // Check which documents have AI summaries
+    const documentsWithSummaries = validDocuments.filter((doc: any) =>
+      doc.document_ai_summaries && doc.document_ai_summaries.length > 0
+    );
+    const documentsWithoutSummaries = validDocuments.filter((doc: any) =>
+      !doc.document_ai_summaries || doc.document_ai_summaries.length === 0
+    );
+
+    console.log(`Documents with AI summaries: ${documentsWithSummaries.length}, without summaries: ${documentsWithoutSummaries.length}`);
+
+    // Combine all document content using AI summaries when available
     const combinedContent = validDocuments.map((doc: any) => {
       const profile = doc.profiles;
-      // Filter content based on selected sections
-      const filteredContent = filterDocumentContent(doc.content, contentSections || ['all-content']);
+      const aiSummary = doc.document_ai_summaries?.[0];
 
-      return `=== ${doc.title} ===
+      // Use AI summary if available (much more efficient and preserves nuances)
+      if (aiSummary) {
+        return `=== ${doc.title} ===
+
+Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
+Type: ${doc.document_type}
+
+OVERVIEW:
+${aiSummary.executive_summary}
+
+CRITICAL INSIGHTS & NUANCES:
+${aiSummary.key_insights}
+
+TACTICAL DETAILS:
+${aiSummary.tactical_details}
+
+CHALLENGES & SOLUTIONS:
+${aiSummary.challenges_solutions}
+
+Topics: ${aiSummary.topics?.join(', ') || 'N/A'}
+Skill Areas: ${aiSummary.skill_areas?.join(', ') || 'N/A'}
+
+---`;
+      } else {
+        // Fallback to filtered/truncated content
+        const filteredContent = filterDocumentContent(doc.content, contentSections || ['all-content']);
+        return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
 Content:
 ${filteredContent}
 
+[Note: Using truncated content - AI summary not available]
+
 ---`;
+      }
     }).join('\n\n');
 
     console.log(`Generating ${type} from ${validDocuments.length} documents. Total content length: ${combinedContent.length} characters`);
@@ -137,9 +196,6 @@ ${filteredContent}
     switch (type) {
       case 'sales-playbook':
         prompt = `You are creating a comprehensive sales playbook by synthesizing insights from ${validDocuments.length} different experiences and best practices.
-
-SOURCE DOCUMENTS:
-${combinedContent}
 
 === YOUR TASK ===
 
@@ -214,9 +270,6 @@ LENGTH: 5-8 pages. Be thorough but practical.
       case 'customer-success-guide':
         prompt = `You are creating a customer success guide by synthesizing insights from ${validDocuments.length} different experiences.
 
-SOURCE DOCUMENTS:
-${combinedContent}
-
 === YOUR TASK ===
 
 Create a 4-6 page customer success guide that captures the most effective approaches and insights from all these experiences.
@@ -279,9 +332,6 @@ LENGTH: 4-6 pages maximum. Be practical and focused on outcomes.
 
       case 'operational-procedures':
         prompt = `You are creating operational procedures by synthesizing insights from ${validDocuments.length} different experiences.
-        
-SOURCE DOCUMENTS:
-${combinedContent}
 
 === YOUR TASK ===
 
@@ -345,9 +395,6 @@ LENGTH: 6-8 pages.
 
       case 'strategic-planning-document':
         prompt = `You are creating a strategic planning document by synthesizing insights from ${validDocuments.length} different experiences.
-
-SOURCE DOCUMENTS:
-${combinedContent}
 
 === YOUR TASK ===
 
@@ -414,10 +461,21 @@ LENGTH: 6-10 pages.
         break;
     }
 
+    // Use prompt caching to reduce costs when generating multiple playbooks
     const response = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 6000,
       temperature: 0.7,
+      system: [
+        {
+          type: "text",
+          text: `You are an expert at synthesizing multiple case studies and best practices into comprehensive, actionable playbooks. You excel at identifying patterns, extracting nuances, and creating practical frameworks.
+
+SOURCE DOCUMENTS (with AI-optimized summaries):
+${combinedContent}`,
+          cache_control: { type: "ephemeral" }
+        }
+      ],
       messages: [
         {
           role: 'user',
@@ -430,15 +488,91 @@ LENGTH: 6-10 pages.
 
     console.log(`Successfully generated ${type} content of length: ${generatedContent.length} characters`);
 
+    // Save playbook to database if requested
+    let savedPlaybook = null;
+    if (savePlaybook && userId) {
+      try {
+        // Get user's organization using admin client
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', userId)
+          .single();
+
+        const profileData = profile as { organization_id: string | null } | null;
+
+        // Generate title if not provided
+        const playbookTitle = title || `${type.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} - ${new Date().toLocaleDateString()}`;
+
+        console.log('Attempting to save playbook:', {
+          title: playbookTitle,
+          userId,
+          organizationId: profileData?.organization_id,
+          documentIdsCount: documentIds.length
+        });
+
+        // Insert playbook into database using admin client (bypasses RLS)
+        const { data: playbook, error: insertError } = await (supabase as any)
+          .from('playbooks')
+          .insert({
+            title: playbookTitle,
+            content: generatedContent,
+            type,
+            user_id: userId,
+            organization_id: profileData?.organization_id || null,
+            is_shared: false,
+            document_ids: documentIds,
+            content_sections: contentSections || ['all-content']
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error saving playbook:', insertError);
+          console.error('Insert error details:', {
+            message: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint
+          });
+          // Don't throw - we still want to return the generated content
+        } else {
+          savedPlaybook = playbook;
+          console.log(`Successfully saved playbook with ID: ${(playbook as any)?.id}`);
+        }
+      } catch (saveError) {
+        // Log but don't fail the entire request if saving fails
+        console.error('Error in playbook save process:', saveError);
+        if (saveError instanceof Error) {
+          console.error('Save error details:', {
+            message: saveError.message,
+            stack: saveError.stack
+          });
+        }
+      }
+    } else if (savePlaybook && !userId) {
+      console.error('Cannot save playbook: userId not provided in request');
+    }
+
     return NextResponse.json({
       content: generatedContent,
       type,
       sourceDocuments: validDocuments.length,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      playbook: savedPlaybook
     });
 
   } catch (error) {
     console.error('Error generating playbook:', error);
+
+    // Log full error details for debugging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
 
     // Provide more specific error messages
     if (error instanceof Error) {
@@ -463,7 +597,10 @@ LENGTH: 6-10 pages.
     }
 
     return NextResponse.json(
-      { error: 'Failed to generate content. Please try again.' },
+      {
+        error: 'Failed to generate content. Please try again.',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

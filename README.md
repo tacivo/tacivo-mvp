@@ -115,12 +115,8 @@ tacivo-interview-mvp/
 │   ├── api/
 │   │   ├── chat-case-study/
 │   │   │   └── route.ts          # Case study interview chat
-│   │   ├── chat-best-practices/
-│   │   │   └── route.ts          # Best practices interview chat
 │   │   ├── generate-doc-case-study/
 │   │   │   └── route.ts          # Case study document generation
-│   │   ├── generate-doc-best-practices/
-│   │   │   └── route.ts          # Best practices doc generation
 │   │   ├── speech-to-text/
 │   │   │   └── route.ts          # Voice transcription
 │   │   └── text-to-speech/
@@ -173,7 +169,6 @@ tacivo-interview-mvp/
 
 ### Chat Endpoints (Streaming)
 - `POST /api/chat-case-study` - Conduct case study interview
-- `POST /api/chat-best-practices` - Conduct best practices interview
 
 **Request Body:**
 ```json
@@ -195,7 +190,6 @@ tacivo-interview-mvp/
 
 ### Document Generation Endpoints
 - `POST /api/generate-doc-case-study` - Generate case study document
-- `POST /api/generate-doc-best-practices` - Generate best practices guide
 
 **Request Body:** Same as chat endpoints
 
@@ -224,8 +218,7 @@ tacivo-interview-mvp/
 
 ### Interview Prompts
 - Case study prompts: `app/api/chat-case-study/route.ts`
-- Best practices prompts: `app/api/chat-best-practices/route.ts`
-- Document templates: `app/api/generate-doc-*/route.ts`
+- Document templates: `app/api/generate-doc-case-study/route.ts`
 
 ### Voice Settings
 - Voice ID: Modify in `app/api/text-to-speech/route.ts`
