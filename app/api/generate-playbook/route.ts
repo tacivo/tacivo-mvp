@@ -440,6 +440,96 @@ ${combinedContent}`,
 
     console.log(`Successfully generated ${type} content of length: ${generatedContent.length} characters`);
 
+    // Convert markdown to BlockNote format
+    const convertMarkdownToBlockNote = (markdown: string) => {
+      const lines = markdown.split('\n');
+      const blocks = [];
+      let blockId = 0;
+
+      for (const line of lines) {
+        if (!line.trim()) {
+          // Empty line - paragraph with empty content
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'paragraph',
+            content: []
+          });
+        } else if (line.startsWith('# ')) {
+          // H1
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'heading',
+            props: { level: 1 },
+            content: [{ type: 'text', text: line.substring(2), styles: {} }]
+          });
+        } else if (line.startsWith('## ')) {
+          // H2
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'heading',
+            props: { level: 2 },
+            content: [{ type: 'text', text: line.substring(3), styles: {} }]
+          });
+        } else if (line.startsWith('### ')) {
+          // H3
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'heading',
+            props: { level: 3 },
+            content: [{ type: 'text', text: line.substring(4), styles: {} }]
+          });
+        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+          // Bullet list item
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'bulletListItem',
+            content: [{ type: 'text', text: line.substring(2), styles: {} }]
+          });
+        } else if (line.match(/^\d+\.\s/)) {
+          // Numbered list item
+          const text = line.replace(/^\d+\.\s/, '');
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'numberedListItem',
+            content: [{ type: 'text', text, styles: {} }]
+          });
+        } else {
+          // Regular paragraph - handle bold and italic
+          let content = line;
+          const parts: Array<{ type: string; text: string; styles: Record<string, boolean> }> = [];
+
+          // Simple parsing for bold (**text**) and italic (*text*)
+          const boldItalicRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|[^*]+)/g;
+          const matches = content.match(boldItalicRegex);
+
+          if (matches) {
+            matches.forEach(match => {
+              if (match.startsWith('**') && match.endsWith('**')) {
+                // Bold
+                parts.push({ type: 'text', text: match.slice(2, -2), styles: { bold: true } });
+              } else if (match.startsWith('*') && match.endsWith('*')) {
+                // Italic
+                parts.push({ type: 'text', text: match.slice(1, -1), styles: { italic: true } });
+              } else if (match) {
+                // Plain text
+                parts.push({ type: 'text', text: match, styles: {} });
+              }
+            });
+          }
+
+          blocks.push({
+            id: `block-${blockId++}`,
+            type: 'paragraph',
+            content: parts.length > 0 ? parts : [{ type: 'text', text: line, styles: {} }]
+          });
+        }
+      }
+
+      return blocks;
+    };
+
+    const blockNoteContent = convertMarkdownToBlockNote(generatedContent);
+
     // Save playbook to database if requested
     let savedPlaybook = null;
     if (savePlaybook && userId) {
@@ -464,11 +554,12 @@ ${combinedContent}`,
         });
 
         // Insert playbook into database using admin client (bypasses RLS)
+        // Store as BlockNote JSON format
         const { data: playbook, error: insertError } = await (supabase as any)
           .from('playbooks')
           .insert({
             title: playbookTitle,
-            content: generatedContent,
+            content: JSON.stringify(blockNoteContent),
             type,
             user_id: userId,
             organization_id: profileData?.organization_id || null,

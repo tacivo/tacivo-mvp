@@ -55,11 +55,11 @@ export default function PlatformHomePage() {
           organization:organizations(name)
         `)
         .eq('id', user.id)
-        .single()
+        .single() as { data: Profile & { organization_id: string | null } | null }
 
       setProfile(profileData)
 
-      // Fetch playbooks
+      // Fetch playbooks (both own and shared from organization)
       const { data: playbooksData } = await (supabase as any)
         .from('playbooks')
         .select(`
@@ -74,7 +74,7 @@ export default function PlatformHomePage() {
             role
           )
         `)
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${user.id},and(is_shared.eq.true,organization_id.eq.${profileData?.organization_id || 'null'})`)
         .order('created_at', { ascending: false })
         .limit(3)
 

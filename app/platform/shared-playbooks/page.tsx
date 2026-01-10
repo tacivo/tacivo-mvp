@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpenIcon, Calendar, User, FileText, Globe, Lock, Trash2, Share2 } from 'lucide-react'
+import { BookOpenIcon, Calendar, User, FileText, Globe, Lock, Trash2, Share2, Library } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Playbook } from '@/types/database.types'
 
@@ -19,6 +19,7 @@ export default function SharedPlaybooksPage() {
   const [playbooks, setPlaybooks] = useState<PlaybookWithProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
     loadPlaybooks()
@@ -31,6 +32,9 @@ export default function SharedPlaybooksPage() {
         router.push('/login')
         return
       }
+
+      // Store current user ID for permission checks
+      setCurrentUserId(user.id)
 
       // Get user's organization
       const { data: profile } = await supabase
@@ -247,24 +251,26 @@ export default function SharedPlaybooksPage() {
               </div>
 
               {/* Actions (only show for owner) */}
-              <div className="mt-4 pt-4 border-t border-border flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleToggleShare(playbook)
-                  }}
-                  className="flex-1 px-3 py-2 text-sm border border-border rounded-lg hover:border-accent/50 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Share2 className="w-4 h-4" />
-                  {playbook.is_shared ? 'Unshare' : 'Share'}
-                </button>
-                <button
-                  onClick={(e) => handleDelete(playbook, e)}
-                  className="px-3 py-2 text-sm border border-border rounded-lg hover:border-red-500 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              {playbook.user_id === currentUserId && (
+                <div className="mt-4 pt-4 border-t border-border flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleShare(playbook)
+                    }}
+                    className="flex-1 px-3 py-2 text-sm border border-border rounded-lg hover:border-accent/50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    {playbook.is_shared ? 'Unshare' : 'Share'}
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(playbook, e)}
+                    className="px-3 py-2 text-sm border border-border rounded-lg hover:border-red-500 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
