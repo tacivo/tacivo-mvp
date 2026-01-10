@@ -3,30 +3,25 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase, Globe, Lock, FileText, Library } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
-import { Playbook, Document } from '@/types/database.types';
+import { shareDocument, unshareDocument } from '@/lib/supabase/interviews';
+import { Document } from '@/types/database.types';
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
 
-type PlaybookWithSources = Playbook & {
-  profiles?: {
-    full_name: string | null
-    role: string | null
-  }
-  sourceDocuments?: Document[]
-}
-
-export default function PlaybookDetailPage() {
+export default function DocumentViewPage() {
   const router = useRouter();
   const params = useParams();
-  const playbookId = params.id as string;
+  const documentId = params.id as string;
 
-  const [playbook, setPlaybook] = useState<PlaybookWithSources | null>(null);
+  const [document, setDocument] = useState<Document | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
@@ -34,12 +29,14 @@ export default function PlaybookDetailPage() {
   const [blockNoteContent, setBlockNoteContent] = useState<any[]>([]);
   const [aiSuggestion, setAiSuggestion] = useState<{ original: string; suggestion: string; blockId: string } | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
-  const [showSources, setShowSources] = useState(true);
 
   // AI helper function with suggestion workflow
   const callAI = async (operation: string, selectedText: string, blockId?: string, showSuggestion: boolean = false) => {
     try {
       setIsLoadingAI(true);
+      console.log('[Client] Calling AI with operation:', operation);
+      console.log('[Client] Selected text length:', selectedText?.length);
+
       const response = await fetch('/api/blocknote-ai', {
         method: 'POST',
         headers: {
@@ -51,15 +48,20 @@ export default function PlaybookDetailPage() {
         }),
       });
 
+      console.log('[Client] Response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[Client] AI API Error:', errorData);
         const errorMsg = errorData.details || errorData.error || 'AI request failed';
         throw new Error(`${errorMsg} (${errorData.errorName || 'Unknown'})`);
       }
 
       const data = await response.json();
+      console.log('[Client] Received response, text length:', data.text?.length);
 
       if (showSuggestion && blockId) {
+        // Show suggestion with accept/reject buttons
         setAiSuggestion({
           original: selectedText,
           suggestion: data.text,
@@ -70,6 +72,7 @@ export default function PlaybookDetailPage() {
 
       return data.text;
     } catch (error: any) {
+      console.error('[Client] AI Error:', error);
       alert(`AI Error: ${error.message || 'Failed to process AI request'}`);
       throw error;
     } finally {
@@ -77,6 +80,7 @@ export default function PlaybookDetailPage() {
     }
   };
 
+  // Accept AI suggestion
   const acceptSuggestion = () => {
     if (!aiSuggestion) return;
 
@@ -87,6 +91,7 @@ export default function PlaybookDetailPage() {
     setAiSuggestion(null);
   };
 
+  // Reject AI suggestion
   const rejectSuggestion = () => {
     setAiSuggestion(null);
   };
@@ -97,16 +102,17 @@ export default function PlaybookDetailPage() {
   });
 
   useEffect(() => {
-    loadPlaybook();
-  }, [playbookId]);
+    loadDocument();
+  }, [documentId]);
 
+  // Update editor when blockNoteContent changes
   useEffect(() => {
     if (blockNoteContent.length > 0 && editor) {
       editor.replaceBlocks(editor.document, blockNoteContent);
     }
   }, [blockNoteContent, editor]);
 
-  async function loadPlaybook() {
+  async function loadDocument() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -116,65 +122,47 @@ export default function PlaybookDetailPage() {
 
       setCurrentUserId(user.id);
 
-      const { data, error } = await (supabase as any)
-        .from('playbooks')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            role
-          )
-        `)
-        .eq('id', playbookId)
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
         .single();
 
       if (error) throw error;
 
-      const playbookData = data as PlaybookWithSources;
+      const doc = data as unknown as Document;
+      setDocument(doc);
 
-      // Fetch source documents
-      if (playbookData.document_ids && playbookData.document_ids.length > 0) {
-        const { data: docs, error: docsError } = await supabase
-          .from('documents')
-          .select('id, title, document_type, created_at')
-          .in('id', playbookData.document_ids);
-
-        if (!docsError && docs) {
-          playbookData.sourceDocuments = docs as Document[];
+      // Parse BlockNote content if format is blocknote
+      if (doc.format === 'blocknote' && doc.content) {
+        try {
+          const parsed = JSON.parse(doc.content);
+          setBlockNoteContent(parsed);
+        } catch (e) {
+          console.error('Error parsing BlockNote content:', e);
+          // Fallback to markdown
         }
       }
-
-      setPlaybook(playbookData);
-
-      // Parse BlockNote content - always treat as blocknote format
-      try {
-        // Try to parse as JSON first (blocknote format)
-        const parsed = JSON.parse(playbookData.content);
-        setBlockNoteContent(parsed);
-      } catch (e) {
-        // If not JSON, convert markdown to BlockNote blocks
-        const markdownBlocks = playbookData.content.split('\n').map((line, idx) => ({
-          id: `block-${idx}`,
-          type: 'paragraph',
-          content: line || ' '
-        }));
-        setBlockNoteContent(markdownBlocks);
-      }
     } catch (error) {
-      console.error('Error loading playbook:', error);
-      alert('Failed to load playbook');
-      router.push('/platform/shared-playbooks');
+      console.error('Error loading document:', error);
+      alert('Failed to load document');
+      router.push('/documents');
     } finally {
       setIsLoading(false);
     }
   }
 
   const copyToClipboard = async () => {
-    if (!playbook || !editor) return;
+    if (!document) return;
 
     try {
-      const markdown = await editor.blocksToMarkdownLossy(editor.document);
-      await navigator.clipboard.writeText(markdown);
+      // Get markdown from editor if in BlockNote format
+      if (document.format === 'blocknote' && editor) {
+        const markdown = await editor.blocksToMarkdownLossy(editor.document);
+        await navigator.clipboard.writeText(markdown);
+      } else {
+        await navigator.clipboard.writeText(document.content);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -183,7 +171,7 @@ export default function PlaybookDetailPage() {
   };
 
   const downloadPDF = async () => {
-    if (!playbook || !editor) return;
+    if (!document) return;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -195,7 +183,7 @@ export default function PlaybookDetailPage() {
     // Title
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    const titleLines = doc.splitTextToSize(playbook.title, maxWidth);
+    const titleLines = doc.splitTextToSize(document.title, maxWidth);
     doc.text(titleLines, margin, yPosition);
     yPosition += titleLines.length * 7 + 10;
 
@@ -203,13 +191,25 @@ export default function PlaybookDetailPage() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
 
-    const markdown = await editor.blocksToMarkdownLossy(editor.document);
-    const plainText = markdown
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\*\*/g, '')
-      .replace(/\*/g, '')
-      .replace(/`/g, '')
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+    let plainText = '';
+    
+    if (document.format === 'blocknote' && editor) {
+      // Convert BlockNote to markdown first, then to plain text
+      const markdown = await editor.blocksToMarkdownLossy(editor.document);
+      plainText = markdown
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/`/g, '')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+    } else {
+      plainText = document.content
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/`/g, '')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+    }
 
     const lines = doc.splitTextToSize(plainText, maxWidth);
 
@@ -222,98 +222,112 @@ export default function PlaybookDetailPage() {
       yPosition += 6;
     }
 
-    doc.save(`${playbook.title}.pdf`);
+    doc.save(`${document.title}.pdf`);
   };
 
   const downloadMarkdown = async () => {
-    if (!playbook || !editor) return;
+    if (!document) return;
 
-    const markdownContent = await editor.blocksToMarkdownLossy(editor.document);
+    let markdownContent = '';
+    
+    if (document.format === 'blocknote' && editor) {
+      markdownContent = await editor.blocksToMarkdownLossy(editor.document);
+    } else {
+      markdownContent = document.content;
+    }
+
     const blob = new Blob([markdownContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = window.document.createElement('a');
     a.href = url;
-    a.download = `${playbook.title}.md`;
+    a.download = `${document.title}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleShareToggle = async () => {
-    if (!playbook) return;
+    if (!document) return;
 
+    setIsSharing(true);
     try {
-      const { error } = await (supabase as any)
-        .from('playbooks')
-        .update({ is_shared: !playbook.is_shared })
-        .eq('id', playbook.id);
-
-      if (error) throw error;
-
-      setPlaybook({ ...playbook, is_shared: !playbook.is_shared });
-      alert(playbook.is_shared ? 'Playbook is now private' : 'Playbook shared with your organization!');
+      if ((document as any).is_shared) {
+        await unshareDocument(document.id);
+        alert('Document is now private');
+      } else {
+        await shareDocument(document.id);
+        alert('Document shared with your company!');
+      }
+      await loadDocument();
     } catch (error) {
       console.error('Error toggling share:', error);
       alert('Failed to update sharing status');
+    } finally {
+      setIsSharing(false);
     }
   };
 
   const handleEditStart = () => {
-    if (!playbook) return;
-    setEditedTitle(playbook.title);
+    if (!document) return;
+    setEditedTitle(document.title);
     setIsEditing(true);
   };
 
   const handleEditCancel = () => {
     setIsEditing(false);
     setEditedTitle('');
+    // Reset editor content
     if (blockNoteContent.length > 0 && editor) {
       editor.replaceBlocks(editor.document, blockNoteContent);
     }
   };
 
   const handleSaveEdit = async () => {
-    if (!playbook || !editor) return;
+    if (!document || !editor) return;
 
     setIsSaving(true);
     try {
+      // Get current blocks from editor
       const currentBlocks = editor.document;
 
-      const { error } = await (supabase as any)
-        .from('playbooks')
-        .update({
+      const { error } = await (supabase
+        .from('documents')
+        .update as any)({
           title: editedTitle,
           content: JSON.stringify(currentBlocks),
+          format: 'blocknote',
           updated_at: new Date().toISOString()
         })
-        .eq('id', playbook.id);
+        .eq('id', document.id);
 
       if (error) throw error;
 
-      setPlaybook({
-        ...playbook,
+      // Update local state
+      setDocument({
+        ...document,
         title: editedTitle,
-        content: JSON.stringify(currentBlocks)
+        content: JSON.stringify(currentBlocks),
+        format: 'blocknote'
       });
 
       setBlockNoteContent(currentBlocks);
       setIsEditing(false);
 
-      alert('Playbook updated successfully!');
+      // Regenerate AI summary in the background (don't wait for it)
+      fetch('/api/generate-ai-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: document.id })
+      }).catch(err => {
+        console.warn('Failed to regenerate AI summary:', err);
+        // Don't show error to user - summary generation is background task
+      });
+
+      alert('Document updated successfully!');
     } catch (error) {
-      console.error('Error updating playbook:', error);
-      alert('Failed to update playbook');
+      console.error('Error updating document:', error);
+      alert('Failed to update document');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'sales-playbook': return 'Sales Playbook'
-      case 'customer-success-guide': return 'Customer Success Guide'
-      case 'operational-procedures': return 'Operational Procedures'
-      case 'strategic-planning-document': return 'Strategic Planning Document'
-      default: return type
     }
   };
 
@@ -321,39 +335,40 @@ export default function PlaybookDetailPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading playbook...</p>
+          <div className="w-12 h-12 border-4 border-book-cloth border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading document...</p>
         </div>
       </div>
     );
   }
 
-  if (!playbook) {
+  if (!document) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold text-foreground mb-2">Playbook not found</h2>
+          <h2 className="text-2xl font-semibold text-foreground mb-2">Document not found</h2>
           <button
-            onClick={() => router.push('/platform/shared-playbooks')}
-            className="text-accent hover:underline"
+            onClick={() => router.push('/documents')}
+            className="text-book-cloth hover:underline"
           >
-            Back to playbooks
+            Back to documents
           </button>
         </div>
       </div>
     );
   }
 
-  const isOwner = currentUserId === playbook.user_id;
+  const isOwner = currentUserId === (document as any).user_id;
+  const isBlockNoteFormat = document.format === 'blocknote';
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
-      {/* Header */}
+      {/* Header - unchanged */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-8 lg:px-16">
           <div className="flex justify-between items-center h-14">
             <button
-              onClick={() => router.push('/platform/shared-playbooks')}
+              onClick={() => router.push('/platform/sessions/completed')}
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1.5 group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -372,14 +387,15 @@ export default function PlaybookDetailPage() {
                   </button>
                   <button
                     onClick={handleShareToggle}
+                    disabled={isSharing}
                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                      playbook.is_shared
-                        ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                      (document as any).is_shared
+                        ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    {playbook.is_shared ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                    {playbook.is_shared ? 'Shared' : 'Private'}
+                    <Share2 className="w-4 h-4" />
+                    {isSharing ? 'Updating...' : (document as any).is_shared ? 'Shared' : 'Share'}
                   </button>
                 </>
               )}
@@ -457,85 +473,38 @@ export default function PlaybookDetailPage() {
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 className="w-full text-[2.5rem] leading-[1.2] font-bold text-gray-900 mb-3 px-2 py-1 -ml-2 border-none focus:outline-none focus:bg-gray-50 rounded placeholder:text-gray-400"
-                placeholder="Untitled Playbook"
+                placeholder="Untitled"
               />
             ) : (
               <h1 className="text-[2.5rem] leading-[1.2] font-bold text-gray-900 mb-3 px-2 -ml-2">
-                {playbook.title}
+                {document.title}
               </h1>
             )}
             <div className="flex items-center gap-4 px-2 text-sm text-gray-500">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
-                {getTypeLabel(playbook.type)}
+                {document.document_type === 'case-study' ? '📋 Case Study' : '📚 Best Practices'}
               </span>
               <span className="flex items-center gap-1.5">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {new Date(playbook.created_at).toLocaleDateString('en-US', {
+                {new Date(document.created_at).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric'
                 })}
               </span>
-              {playbook.is_shared && (
-                <span className="flex items-center gap-1.5 text-green-600">
-                  <Globe className="w-4 h-4" />
-                  Shared with organization
-                </span>
-              )}
-              {playbook.profiles?.full_name && (
-                <span className="flex items-center gap-1.5">
-                  Created by {playbook.profiles.full_name}
+              {(document as any).is_shared && (
+                <span className="flex items-center gap-1.5 text-blue-600">
+                  <Share2 className="w-4 h-4" />
+                  Shared with team
                 </span>
               )}
             </div>
           </div>
 
-          {/* Source Documents */}
-          {playbook.sourceDocuments && playbook.sourceDocuments.length > 0 && (
-            <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
-              <button
-                onClick={() => setShowSources(!showSources)}
-                className="flex items-center justify-between w-full text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-gray-600" />
-                  <span className="font-medium text-gray-900">
-                    Source Documents ({playbook.sourceDocuments.length})
-                  </span>
-                </div>
-                <span className="text-gray-400">
-                  {showSources ? '▼' : '▶'}
-                </span>
-              </button>
-
-              {showSources && (
-                <div className="mt-3 space-y-2">
-                  {playbook.sourceDocuments.map((doc) => (
-                    <button
-                      key={doc.id}
-                      onClick={() => router.push(`/platform/experiences/${doc.id}`)}
-                      className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors flex items-center justify-between group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-accent" />
-                        <span className="text-sm text-gray-900 group-hover:text-accent transition-colors">
-                          {doc.title}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* AI Toolbar - Only show in edit mode */}
-          {isEditing && (
+          {/* AI Toolbar - Only show in edit mode for BlockNote documents */}
+          {isEditing && isBlockNoteFormat && (
             <div className="mb-4 space-y-3">
               <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
                 <div className="flex items-start gap-3">
@@ -641,6 +610,7 @@ export default function PlaybookDetailPage() {
           {aiSuggestion && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-purple-600" />
@@ -654,7 +624,9 @@ export default function PlaybookDetailPage() {
                   </button>
                 </div>
 
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {/* Original */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Original
@@ -664,6 +636,7 @@ export default function PlaybookDetailPage() {
                     </div>
                   </div>
 
+                  {/* Suggestion */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       AI Suggestion
@@ -674,6 +647,7 @@ export default function PlaybookDetailPage() {
                   </div>
                 </div>
 
+                {/* Footer */}
                 <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
                   <button
                     onClick={rejectSuggestion}
@@ -701,13 +675,35 @@ export default function PlaybookDetailPage() {
             </div>
           )}
 
-          {/* Content - BlockNote Editor */}
+          {/* Content */}
           <div className="mt-8">
-            <BlockNoteView
-              editor={editor}
-              editable={isEditing}
-              theme="light"
-            />
+            {isBlockNoteFormat ? (
+              <BlockNoteView
+                editor={editor}
+                editable={isEditing}
+                theme="light"
+              />
+            ) : (
+              <article
+                className="notion-content prose prose-lg max-w-none
+                  prose-headings:font-bold prose-headings:tracking-tight
+                  prose-h1:text-3xl prose-h1:mt-8 prose-h1:mb-4
+                  prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-3
+                  prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-2
+                  prose-p:text-gray-700 prose-p:leading-relaxed prose-p:my-3
+                  prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                  prose-strong:text-gray-900 prose-strong:font-semibold
+                  prose-ul:my-3 prose-ol:my-3
+                  prose-li:text-gray-700 prose-li:my-1
+                  prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:text-pink-600 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
+                  prose-pre:bg-gray-900 prose-pre:text-gray-100
+                  prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-600
+                  prose-hr:border-gray-200 prose-hr:my-8"
+                style={{ fontSize: '16px', lineHeight: '1.75' }}
+              >
+                <ReactMarkdown>{document.content}</ReactMarkdown>
+              </article>
+            )}
           </div>
         </motion.div>
       </main>

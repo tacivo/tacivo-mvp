@@ -368,7 +368,7 @@ export default function DocumentViewPage() {
         <div className="max-w-5xl mx-auto px-8 lg:px-16">
           <div className="flex justify-between items-center h-14">
             <button
-              onClick={() => router.push('/platform')}
+              onClick={() => router.push('/platform/experiences')}
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1.5 group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />

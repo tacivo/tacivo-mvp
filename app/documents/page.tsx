@@ -59,7 +59,7 @@ function DocumentsPageContent() {
   };
 
   const handleViewDocument = (documentId: string) => {
-    router.push(`/documents/${documentId}`);
+    router.push(`/platform/sessions/completed/${documentId}`);
   };
 
   const handleDeleteInterview = async (interviewId: string) => {

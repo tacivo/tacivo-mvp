@@ -59,7 +59,7 @@ export default function CompletedSessionsPage() {
   }
 
   const handleViewDocument = (documentId: string) => {
-    router.push(`/documents/${documentId}`)
+    router.push(`/platform/sessions/completed/${documentId}`)
   }
 
   if (isLoading) {

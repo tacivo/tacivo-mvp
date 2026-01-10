@@ -122,7 +122,11 @@ export default function PlatformHomePage() {
   }
 
   const handleViewDocument = (documentId: string) => {
-    router.push(`/documents/${documentId}`)
+    router.push(`/platform/sessions/completed/${documentId}`)
+  }
+
+  const handleViewSharedDocument = (documentId: string) => {
+    router.push(`/platform/experiences/${documentId}`)
   }
 
   const handleResumeInterview = (interviewId: string) => {
@@ -300,7 +304,7 @@ export default function PlatformHomePage() {
                       <div
                         key={doc.id}
                         className="bg-card rounded-lg border border-border p-4 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
-                        onClick={() => handleViewDocument(doc.id)}
+                        onClick={() => handleViewSharedDocument(doc.id)}
                       >
                         <div className="flex items-start gap-4">
                           <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${colors[colorIndex]} flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm`}>

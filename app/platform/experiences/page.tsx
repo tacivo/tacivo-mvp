@@ -135,7 +135,7 @@ export default function ExperiencesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
-              onClick={() => router.push(`/documents/${doc.id}`)}
+              onClick={() => router.push(`/platform/experiences/${doc.id}`)}
               className="bg-card rounded-lg border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
             >
               {/* Document Icon and Function Area */}
@@ -177,7 +177,7 @@ export default function ExperiencesPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    router.push(`/documents/${doc.id}`)
+                    router.push(`/platform/experiences/${doc.id}`)
                   }}
                   className="w-full px-4 py-2 bg-accent/10 text-accent rounded-lg font-medium hover:bg-accent/20 transition-colors flex items-center justify-center gap-2"
                 >

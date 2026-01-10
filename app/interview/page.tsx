@@ -232,7 +232,7 @@ function ExperiencePageContent() {
       })
 
       // Redirect to document viewing page
-      router.push(`/documents/${doc.id}`)
+      router.push(`/platform/sessions/completed/${doc.id}`)
     } catch (error) {
       console.error('Error ending interview:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'

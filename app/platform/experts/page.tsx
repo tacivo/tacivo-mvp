@@ -309,7 +309,7 @@ export default function ExpertsPage() {
                           key={doc.id}
                           onClick={() => {
                             setSelectedExpert(null)
-                            router.push(`/documents/${doc.id}`)
+                            router.push(`/platform/experiences/${doc.id}`)
                           }}
                           className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
                         >
