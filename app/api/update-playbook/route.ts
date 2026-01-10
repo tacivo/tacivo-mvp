@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     // If there are no new documents and no additional context, return early
     if ((!newDocumentIds || newDocumentIds.length === 0) && !additionalContext) {
       // Just update the document_ids array
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('playbooks')
         .update({
           document_ids: documentIds,
@@ -207,7 +207,7 @@ Return ONLY the complete updated playbook content (not the title, just the conte
     console.log(`Successfully updated playbook. New length: ${updatedContent.length} characters`);
 
     // Update the playbook in the database
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('playbooks')
       .update({
         content: updatedContent,

@@ -53,8 +53,8 @@ export default function UpdatePlaybooksPage() {
         return
       }
 
-      // Fetch user's playbooks
-      const { data: playbooksData } = await supabase
+      // Fetch only user's own playbooks (they can only update their own)
+      const { data: playbooksData, error: playbooksError } = await supabase
         .from('playbooks')
         .select(`
           *,
@@ -65,7 +65,12 @@ export default function UpdatePlaybooksPage() {
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
 
-      setPlaybooks(playbooksData as PlaybookWithProfile[] || [])
+      if (playbooksError) {
+        console.error('Error fetching playbooks:', playbooksError)
+      } else {
+        console.log('Loaded playbooks:', playbooksData)
+        setPlaybooks(playbooksData as PlaybookWithProfile[] || [])
+      }
 
       // Fetch accessible documents
       const accessibleDocs = await getAccessibleDocuments()
