@@ -8,6 +8,7 @@ import {
   InterviewMessage,
   Document
 } from '@/types/database.types'
+import { extractPlainTextFromBlockNoteString } from '@/lib/blocknote-utils'
 
 /**
  * Create a new interview
@@ -147,31 +148,30 @@ export async function getInterviewMessages(interviewId: string) {
 }
 
 /**
- * Create document and trigger AI summary generation
+ * Create document and extract plain text
  */
 export async function createDocument(data: InsertDocument) {
+  // Extract plain text if format is blocknote
+  let plainText = '';
+  if (data.format === 'blocknote' && data.content) {
+    plainText = extractPlainTextFromBlockNoteString(data.content);
+  }
+
+  // Include plain_text in the insert data
+  const insertData = {
+    ...data,
+    ...(plainText ? { plain_text: plainText } : {})
+  };
+
   const { data: document, error } = await supabase
     .from('documents')
-    .insert(data as any)
+    .insert(insertData as any)
     .select()
     .single()
 
   if (error) throw error
 
-  // Trigger AI summary generation in the background (don't wait for it)
-  const doc = document as Document;
-  if (doc) {
-    fetch('/api/generate-ai-summary', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentId: doc.id })
-    }).catch(err => {
-      console.warn('Failed to trigger AI summary generation:', err);
-      // Don't throw - summary generation is optional background task
-    });
-  }
-
-  return doc
+  return document as Document
 }
 
 /**

@@ -302,47 +302,6 @@ export interface Database {
           updated_at?: string
         }
       }
-      document_ai_summaries: {
-        Row: {
-          id: string
-          document_id: string
-          executive_summary: string
-          key_insights: string
-          tactical_details: string
-          challenges_solutions: string
-          topics: string[]
-          skill_areas: string[]
-          importance_scores: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          document_id: string
-          executive_summary: string
-          key_insights: string
-          tactical_details: string
-          challenges_solutions: string
-          topics?: string[]
-          skill_areas?: string[]
-          importance_scores?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          document_id?: string
-          executive_summary?: string
-          key_insights?: string
-          tactical_details?: string
-          challenges_solutions?: string
-          topics?: string[]
-          skill_areas?: string[]
-          importance_scores?: Json
-          created_at?: string
-          updated_at?: string
-        }
-      }
       uploaded_files: {
         Row: {
           id: string

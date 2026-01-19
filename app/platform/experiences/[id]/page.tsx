@@ -12,6 +12,7 @@ import { Document } from '@/types/database.types';
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
+import { extractPlainTextFromBlockNote } from "@/lib/blocknote-utils";
 
 export default function DocumentViewPage() {
   const router = useRouter();
@@ -313,12 +314,16 @@ export default function DocumentViewPage() {
       // Get current blocks from editor
       const currentBlocks = editor.document;
 
+      // Extract plain text from blocks
+      const plainText = extractPlainTextFromBlockNote(currentBlocks);
+
       const { error } = await (supabase
         .from('documents')
         .update as any)({
           title: editedTitle,
           content: JSON.stringify(currentBlocks),
           format: 'blocknote',
+          plain_text: plainText,
           updated_at: new Date().toISOString()
         })
         .eq('id', document.id);
@@ -335,16 +340,6 @@ export default function DocumentViewPage() {
 
       setBlockNoteContent(currentBlocks);
       setIsEditing(false);
-
-      // Regenerate AI summary in the background (don't wait for it)
-      fetch('/api/generate-ai-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: document.id })
-      }).catch(err => {
-        console.warn('Failed to regenerate AI summary:', err);
-        // Don't show error to user - summary generation is background task
-      });
 
       alert('Document updated successfully!');
     } catch (error) {

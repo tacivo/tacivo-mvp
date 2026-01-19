@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = supabaseAdmin;
 
-    // Fetch all selected documents with their AI summaries
+    // Fetch all selected documents with plain text
     const { data: documents, error } = await supabase
       .from('documents')
       .select(`
@@ -43,14 +43,6 @@ export async function POST(req: NextRequest) {
           full_name,
           role,
           years_of_experience
-        ),
-        document_ai_summaries (
-          executive_summary,
-          key_insights,
-          tactical_details,
-          challenges_solutions,
-          topics,
-          skill_areas
         )
       `)
       .in('id', documentIds);
@@ -64,9 +56,8 @@ export async function POST(req: NextRequest) {
     console.log('Document details:', documents?.map((d: any) => ({
       id: d.id,
       title: d.title,
-      contentLength: d.content?.length || 0,
-      hasContent: !!(d.content && d.content.trim()),
-      hasSummary: !!(d.document_ai_summaries && d.document_ai_summaries.length > 0)
+      plainTextLength: d.plain_text?.length || 0,
+      hasPlainText: !!(d.plain_text && d.plain_text.trim())
     })));
 
     if (!documents || documents.length === 0) {
@@ -77,8 +68,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if documents have content and filter out empty ones
-    const validDocuments = documents.filter((doc: any) => doc.content && doc.content.trim().length > 0);
+    // Check if documents have plain_text and filter out empty ones
+    const validDocuments = documents.filter((doc: any) => doc.plain_text && doc.plain_text.trim().length > 0);
 
     if (validDocuments.length < 2) {
       return NextResponse.json(
@@ -87,58 +78,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check which documents have AI summaries
-    const documentsWithSummaries = validDocuments.filter((doc: any) =>
-      doc.document_ai_summaries && doc.document_ai_summaries.length > 0
-    );
-    const documentsWithoutSummaries = validDocuments.filter((doc: any) =>
-      !doc.document_ai_summaries || doc.document_ai_summaries.length === 0
-    );
+    console.log(`Using plain text from ${validDocuments.length} documents`);
 
-    console.log(`Documents with AI summaries: ${documentsWithSummaries.length}, without summaries: ${documentsWithoutSummaries.length}`);
-
-    // Combine all document content using AI summaries when available
+    // Combine all document plain text content
     const combinedContent = validDocuments.map((doc: any) => {
       const profile = doc.profiles;
-      const aiSummary = doc.document_ai_summaries?.[0];
 
-      // Use AI summary if available (much more efficient and preserves nuances)
-      if (aiSummary) {
-        return `=== ${doc.title} ===
+      return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
 
-OVERVIEW:
-${aiSummary.executive_summary}
-
-CRITICAL INSIGHTS & NUANCES:
-${aiSummary.key_insights}
-
-TACTICAL DETAILS:
-${aiSummary.tactical_details}
-
-CHALLENGES & SOLUTIONS:
-${aiSummary.challenges_solutions}
-
-Topics: ${aiSummary.topics?.join(', ') || 'N/A'}
-Skill Areas: ${aiSummary.skill_areas?.join(', ') || 'N/A'}
-
----`;
-      } else {
-        // Fallback to truncated content (AI summary not available)
-        const truncatedContent = doc.content.length > 5000 ? doc.content.substring(0, 5000) + '...' : doc.content;
-        return `=== ${doc.title} ===
-
-Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
-Type: ${doc.document_type}
 Content:
-${truncatedContent}
-
-[Note: Using truncated content - AI summary not available]
+${doc.plain_text}
 
 ---`;
-      }
     }).join('\n\n');
 
     console.log(`Generating ${type} from ${validDocuments.length} documents. Total content length: ${combinedContent.length} characters`);
@@ -423,7 +377,7 @@ LENGTH: 6-10 pages.
           type: "text",
           text: `You are an expert at synthesizing multiple case studies and best practices into comprehensive, actionable playbooks. You excel at identifying patterns, extracting nuances, and creating practical frameworks.
 
-SOURCE DOCUMENTS (with AI-optimized summaries):
+SOURCE DOCUMENTS:
 ${combinedContent}`,
           cache_control: { type: "ephemeral" }
         }

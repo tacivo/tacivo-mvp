@@ -109,8 +109,8 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Filter valid documents and prepare content
-      const validDocuments = newDocuments.filter((doc: any) => doc.content && doc.content.trim().length > 0);
+      // Filter valid documents (those with plain_text) and prepare content
+      const validDocuments = newDocuments.filter((doc: any) => doc.plain_text && doc.plain_text.trim().length > 0);
 
       if (validDocuments.length === 0) {
         return NextResponse.json(
@@ -121,15 +121,14 @@ export async function POST(req: NextRequest) {
 
       newDocumentsContent = validDocuments.map((doc: any) => {
         const profile = doc.profiles;
-        // Limit each document to ~3k characters to prevent token overflow
-        const content = doc.content.length > 3000 ? doc.content.substring(0, 3000) + '...' : doc.content;
 
         return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
+
 Content:
-${content}
+${doc.plain_text}
 
 ---`;
       }).join('\n\n');
