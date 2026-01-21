@@ -149,7 +149,7 @@ export default function SharedPlaybooksPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-semibold text-foreground mb-2">Playbooks</h1>
         <p className="text-muted-foreground">
-          View and manage your generated playbooks and guides
+          AI-synthesized guides that find patterns across experiences to create best practices
         </p>
       </div>
 

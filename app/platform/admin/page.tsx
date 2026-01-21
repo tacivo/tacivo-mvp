@@ -25,10 +25,9 @@ export default function AdminPage() {
     size: ''
   })
   const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalInterviews: 0,
-    totalDocuments: 0,
-    totalExperts: 0
+    totalExperts: 0,
+    totalExperiences: 0,
+    totalPlaybooks: 0
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>('')
@@ -105,12 +104,6 @@ export default function AdminPage() {
     if (!orgId) return
 
     try {
-      // Get total users in organization
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', orgId)
-
       // Get total experts in organization
       const { count: expertsCount } = await supabase
         .from('profiles')
@@ -118,21 +111,23 @@ export default function AdminPage() {
         .eq('organization_id', orgId)
         .eq('is_expert', true)
 
-      // Get total interviews
-      const { count: interviewsCount } = await supabase
-        .from('interviews')
-        .select('*', { count: 'exact', head: true })
-
-      // Get total documents
-      const { count: documentsCount } = await supabase
+      // Get total shared experiences (documents with is_shared = true)
+      const { count: experiencesCount } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true })
+        .eq('is_shared', true)
+
+      // Get total shared playbooks in organization
+      const { count: playbooksCount } = await (supabase as any)
+        .from('playbooks')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('is_shared', true)
 
       setStats({
-        totalUsers: usersCount || 0,
-        totalInterviews: interviewsCount || 0,
-        totalDocuments: documentsCount || 0,
-        totalExperts: expertsCount || 0
+        totalExperts: expertsCount || 0,
+        totalExperiences: experiencesCount || 0,
+        totalPlaybooks: playbooksCount || 0
       })
     } catch (error) {
       console.error('Error loading stats:', error)
@@ -352,36 +347,48 @@ export default function AdminPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-4 gap-6 mb-12">
-        <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3 mb-3">
-            <UsersIcon className="w-6 h-6 text-accent" />
-            <p className="text-sm font-medium text-muted-foreground">Total Users</p>
-          </div>
-          <p className="text-3xl font-semibold text-foreground">{stats.totalUsers}</p>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3 mb-3">
-            <ChartBarIcon className="w-6 h-6 text-accent" />
-            <p className="text-sm font-medium text-muted-foreground">Interviews</p>
-          </div>
-          <p className="text-3xl font-semibold text-foreground">{stats.totalInterviews}</p>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3 mb-3">
-            <ChartBarIcon className="w-6 h-6 text-accent" />
-            <p className="text-sm font-medium text-muted-foreground">Documents</p>
-          </div>
-          <p className="text-3xl font-semibold text-foreground">{stats.totalDocuments}</p>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
+        <div
+          onClick={() => router.push('/platform/experts')}
+          className="bg-card rounded-xl border border-border p-6 hover:shadow-md hover:border-accent/50 transition-all cursor-pointer"
+        >
           <div className="flex items-center gap-3 mb-3">
             <UsersIcon className="w-6 h-6 text-accent" />
             <p className="text-sm font-medium text-muted-foreground">Experts</p>
           </div>
           <p className="text-3xl font-semibold text-foreground">{stats.totalExperts}</p>
+        </div>
+
+        <div
+          onClick={() => router.push('/platform/experiences')}
+          className="bg-card rounded-xl border border-border p-6 hover:shadow-md hover:border-accent/50 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <ChartBarIcon className="w-6 h-6 text-accent" />
+            <p className="text-sm font-medium text-muted-foreground">Experiences</p>
+          </div>
+          <p className="text-3xl font-semibold text-foreground">{stats.totalExperiences}</p>
+        </div>
+
+        <div
+          onClick={() => router.push('/platform/shared-playbooks')}
+          className="bg-card rounded-xl border border-border p-6 hover:shadow-md hover:border-accent/50 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <ChartBarIcon className="w-6 h-6 text-accent" />
+            <p className="text-sm font-medium text-muted-foreground">Playbooks</p>
+          </div>
+          <p className="text-3xl font-semibold text-foreground">{stats.totalPlaybooks}</p>
+        </div>
+
+        <div
+          onClick={() => router.push('/platform/admin/invitations')}
+          className="bg-card rounded-xl border border-border p-6 hover:shadow-md hover:border-accent/50 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <UsersIcon className="w-6 h-6 text-accent" />
+            <p className="text-sm font-medium text-muted-foreground">Invitations</p>
+          </div>
+          <p className="text-sm font-medium text-accent">Manage Invitations →</p>
         </div>
       </div>
 
@@ -672,47 +679,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Team Management */}
-      <div className="mb-12">
-        <div className="bg-card rounded-xl border border-border p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <UsersIcon className="w-8 h-8 text-accent" />
-            <h2 className="text-2xl font-semibold text-foreground">Team & Invitations</h2>
-          </div>
-          <p className="text-muted-foreground mb-6">
-            Invite team members and experts to join your organization
-          </p>
-          <button
-            onClick={() => router.push('/platform/admin/invitations')}
-            className="px-4 py-2 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
-          >
-            Manage Invitations
-          </button>
-        </div>
-      </div>
 
-      {/* Coming Soon Features */}
-      <div className="mt-12 bg-secondary rounded-xl border border-border p-8">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Coming Soon</h3>
-        <div className="grid md:grid-cols-2 gap-4 text-sm">
-          <div className="flex gap-3">
-            <span className="text-accent font-bold">•</span>
-            <p className="text-muted-foreground">User role management and permissions</p>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-accent font-bold">•</span>
-            <p className="text-muted-foreground">Advanced analytics and reporting</p>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-accent font-bold">•</span>
-            <p className="text-muted-foreground">Organization-wide knowledge settings</p>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-accent font-bold">•</span>
-            <p className="text-muted-foreground">Integration management</p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
