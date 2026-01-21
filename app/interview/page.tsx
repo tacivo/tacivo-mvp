@@ -2,18 +2,127 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Upload, X, FileText, Sparkles, Send, Mic, Volume2, Square, FileDown } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { ArrowLeft, Upload, X, FileText, Sparkles, Send, Mic, Volume2, VolumeX, FileDown, User, StopCircle, Pencil, Check, HelpCircle, RotateCcw } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase/client'
 import { Profile } from '@/types/database.types'
 import { createInterview, addInterviewMessage, updateInterviewStatus, getInterviewMessages, createDocument, getInterview } from '@/lib/supabase/interviews'
 import { useVoiceControls } from '@/hooks/useVoiceControls'
+import Image from 'next/image'
 
 type ExperienceContext = {
   process: string
   title: string
   description: string
   uploadedFiles: File[]
+}
+
+// Editable Info Card Component
+function EditableInfoCard({
+  label,
+  value,
+  onChange,
+  multiline = false
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  multiline?: boolean
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(value)
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  const textareaEditRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    setEditValue(value)
+  }, [value])
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+    }
+    if (isEditing && textareaEditRef.current) {
+      textareaEditRef.current.focus()
+      // Auto-resize textarea
+      textareaEditRef.current.style.height = 'auto'
+      textareaEditRef.current.style.height = textareaEditRef.current.scrollHeight + 'px'
+    }
+  }, [isEditing])
+
+  const handleSave = () => {
+    onChange(editValue)
+    setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !multiline) {
+      e.preventDefault()
+      handleSave()
+    }
+    if (e.key === 'Escape') {
+      setEditValue(value)
+      setIsEditing(false)
+    }
+  }
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditValue(e.target.value)
+    // Auto-resize on input
+    e.target.style.height = 'auto'
+    e.target.style.height = e.target.scrollHeight + 'px'
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-3 group">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+        {!isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-foreground transition-all"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        )}
+        {isEditing && (
+          <button
+            onClick={handleSave}
+            className="p-1 rounded text-accent hover:bg-accent/10 transition-all"
+          >
+            <Check className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {isEditing ? (
+        multiline ? (
+          <textarea
+            ref={textareaEditRef}
+            value={editValue}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            className="w-full text-sm text-foreground bg-muted/50 border border-border rounded-lg px-2 py-1.5 outline-none focus:border-accent/50 resize-none overflow-hidden"
+            style={{ minHeight: '60px' }}
+          />
+        ) : (
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            className="w-full text-sm text-foreground bg-muted/50 border border-border rounded-lg px-2 py-1.5 outline-none focus:border-accent/50"
+          />
+        )
+      ) : (
+        <p className={`text-sm text-foreground ${multiline ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
+          {value || <span className="text-muted-foreground italic">Not set</span>}
+        </p>
+      )}
+    </div>
+  )
 }
 
 type Message = {
@@ -44,6 +153,7 @@ function ExperiencePageContent() {
   const [currentInterviewId, setCurrentInterviewId] = useState<string | null>(null)
   const [interviewProgress, setInterviewProgress] = useState(0)
   const [isEndingInterview, setIsEndingInterview] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -171,11 +281,62 @@ function ExperiencePageContent() {
   // Update progress based on message count
   useEffect(() => {
     if (messages.length > 0) {
-      // Estimate progress: 10 exchanges = 100%
-      const progress = Math.min((messages.length / 20) * 100, 95) // Cap at 95% until completed
+      // Estimate progress: 10 exchanges (20 messages) = 100%
+      const progress = Math.min((messages.length / 20) * 100, 100)
       setInterviewProgress(progress)
     }
   }, [messages])
+
+  // Press-to-talk: Hold 'T' to record, release to stop
+  useEffect(() => {
+    if (step !== 'chat') return
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ignore if typing in input fields
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+        return
+      }
+
+      // Press 'T' to start recording (only if not already recording)
+      if (e.key.toLowerCase() === 't' && !e.repeat && !voiceControls.isRecording && !voiceControls.isTranscribing) {
+        e.preventDefault()
+        await voiceControls.startRecording()
+      }
+    }
+
+    const handleKeyUp = async (e: KeyboardEvent) => {
+      // Release 'T' to stop recording
+      if (e.key.toLowerCase() === 't' && voiceControls.isRecording) {
+        e.preventDefault()
+        try {
+          const transcribedText = await voiceControls.stopRecording()
+          setInputMessage(prev => {
+            const newText = prev ? `${prev} ${transcribedText}` : transcribedText
+            return newText.trim()
+          })
+          // Focus the textarea after transcription
+          setTimeout(() => {
+            textareaRef.current?.focus()
+            // Move cursor to end of text
+            if (textareaRef.current) {
+              const len = textareaRef.current.value.length
+              textareaRef.current.setSelectionRange(len, len)
+            }
+          }, 50)
+        } catch (error) {
+          console.error('Failed to transcribe:', error)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [step, voiceControls.isRecording, voiceControls.isTranscribing, voiceControls])
 
   const handleEndInterview = async () => {
     if (!currentInterviewId || !userProfile) return
@@ -477,10 +638,20 @@ function ExperiencePageContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Logo - Fixed top left */}
+      <div className="fixed top-4 left-4 z-20">
+        <Image
+          src="/assets/logo/svg/10.svg"
+          alt="Tacivo"
+          width={162}
+          height={162}
+        />
+      </div>
+
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="flex items-center h-16">
+          <div className="flex items-center h-16 pl-12">
             <button
               onClick={() => step === 'welcome' ? router.push('/platform') : setStep('welcome')}
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -659,191 +830,362 @@ function ExperiencePageContent() {
         )}
 
         {step === 'chat' && (
-          <div className="max-w-4xl mx-auto h-[calc(100vh-12rem)] flex flex-col">
-            {/* Header with Progress and Controls */}
-            <div className="mb-6 space-y-4">
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Interview Progress</span>
-                  <span className="font-medium text-foreground">{Math.round(interviewProgress)}%</span>
-                </div>
-                <div className="w-full h-2 bg-card border border-border rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-accent"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${interviewProgress}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
+          <div className="fixed inset-0 top-16 flex">
+            {/* Left Sidebar - Compact Session Info */}
+            <div className="w-64 flex-shrink-0 border-r border-border bg-card/50 p-4 flex flex-col gap-3 overflow-y-auto">
+              {/* Header with Help Icon */}
+              <div className="flex items-center justify-between pb-2">
+                <span className="text-sm font-medium text-foreground">Session Info</span>
+                <button
+                  onClick={() => setShowHelpModal(true)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  title="How this works"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Progress */}
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">Progress</span>
+                    <span className="text-xs font-medium text-foreground">{Math.round(interviewProgress)}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-accent rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${interviewProgress}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </div>
+                  {/* Progress instruction text */}
+                  {interviewProgress < 100 && (
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      Reach 100% to generate your document
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-4">
+              {/* Editable Session Info Cards */}
+              <div className="space-y-2">
+                <EditableInfoCard
+                  label="Area"
+                  value={context.process}
+                  onChange={(value) => setContext({ ...context, process: value })}
+                />
+                <EditableInfoCard
+                  label="Title"
+                  value={context.title}
+                  onChange={(value) => setContext({ ...context, title: value })}
+                />
+                <EditableInfoCard
+                  label="Description"
+                  value={context.description}
+                  onChange={(value) => setContext({ ...context, description: value })}
+                  multiline
+                />
+              </div>
+
+              {/* Voice Controls */}
+              <div className="pt-3 border-t border-border/50 mt-auto">
                 <div className="flex items-center gap-2">
-                  {/* Replay Last Message */}
                   {messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
                     <button
                       onClick={handlePlayLastMessage}
                       disabled={voiceControls.isPlaying}
-                      className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Replay last AI response"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-muted/50 text-xs text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                      title="Replay last response"
                     >
-                      <Volume2 className="w-4 h-4" />
-                      {voiceControls.isPlaying ? 'Playing...' : 'Replay'}
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Replay</span>
                     </button>
                   )}
-
-                  {/* Auto-play Toggle */}
                   <button
                     onClick={voiceControls.toggleAutoPlay}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs transition-colors ${
                       voiceControls.autoPlayEnabled
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-card border border-border text-foreground hover:bg-accent/10'
+                        ? 'bg-accent/10 text-accent'
+                        : 'bg-muted/50 text-foreground hover:bg-muted'
                     }`}
-                    title={voiceControls.autoPlayEnabled ? 'Auto-play enabled' : 'Auto-play disabled'}
+                    title={voiceControls.autoPlayEnabled ? 'Auto-play ON' : 'Auto-play OFF'}
                   >
-                    <Volume2 className="w-4 h-4" />
-                    Auto-play {voiceControls.autoPlayEnabled ? 'ON' : 'OFF'}
+                    {voiceControls.autoPlayEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    <span>Auto</span>
                   </button>
                 </div>
+              </div>
 
-                {/* End Interview Button */}
+              {/* Finish Button - Only show at 100% */}
+              {interviewProgress >= 100 && (
                 <button
                   onClick={handleEndInterview}
-                  disabled={isEndingInterview || messages.length < 5}
-                  className="flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground border border-accent rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={messages.length < 5 ? 'Continue the conversation before ending' : 'End interview and generate case study document'}
+                  disabled={isEndingInterview}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Generate case study"
                 >
                   {isEndingInterview ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-accent-foreground border-t-transparent rounded-full animate-spin" />
-                      Generating Document...
+                      <div className="w-3.5 h-3.5 border-2 border-accent-foreground border-t-transparent rounded-full animate-spin" />
+                      <span>Generating...</span>
                     </>
                   ) : (
                     <>
-                      <FileDown className="w-4 h-4" />
-                      Generate Case Study
+                      <FileDown className="w-3.5 h-3.5" />
+                      <span>Generate Case Study</span>
                     </>
                   )}
                 </button>
-              </div>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto space-y-6 mb-6 pr-4">
-              {messages.map((message, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] px-6 py-4 rounded-2xl ${
-                      message.role === 'user'
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-card border border-border text-foreground'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  </div>
-                </motion.div>
-              ))}
-
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] px-6 py-4 rounded-2xl bg-card border border-border">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                </div>
               )}
-
-              <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
-            <div className="border-t border-border pt-6">
-              <div className="flex items-end gap-4">
-                {/* Microphone Button for Speech-to-Text */}
-                <button
-                  onClick={async () => {
-                    if (voiceControls.isRecording) {
-                      try {
-                        const transcribedText = await voiceControls.stopRecording()
-                        setInputMessage(prev => {
-                          const newText = prev ? `${prev} ${transcribedText}` : transcribedText
-                          return newText.trim()
-                        })
-                      } catch (error) {
-                        console.error('Failed to transcribe:', error)
-                      }
-                    } else {
-                      await voiceControls.startRecording()
-                    }
-                  }}
-                  disabled={voiceControls.isTranscribing}
-                  className={`px-4 py-3 rounded-2xl font-medium transition-all flex items-center gap-2 h-[48px] disabled:opacity-50 disabled:cursor-not-allowed ${
-                    voiceControls.isRecording
-                      ? 'bg-accent text-accent-foreground animate-pulse'
-                      : voiceControls.isTranscribing
-                      ? 'bg-accent/50 text-accent-foreground'
-                      : 'bg-card border border-border text-foreground hover:bg-accent/10'
-                  }`}
-                  title={
-                    voiceControls.isRecording
-                      ? 'Stop recording'
-                      : voiceControls.isTranscribing
-                      ? 'Transcribing...'
-                      : 'Start voice input'
-                  }
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
+            {/* Main Chat Area - Full Height */}
+            <div className="flex-1 flex flex-col min-w-0 bg-background">
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto px-6 py-6 space-y-1">
+                  <AnimatePresence mode="popLayout">
+                    {messages.map((message, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`group flex gap-3 py-4 px-3 rounded-xl transition-colors ${
+                          message.role === 'assistant' ? 'hover:bg-muted/30' : ''
+                        }`}
+                      >
+                        {/* Avatar */}
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden ${
+                          message.role === 'assistant'
+                            ? ''
+                            : 'bg-foreground/10 text-foreground'
+                        }`}>
+                          {message.role === 'assistant' ? (
+                            <Image
+                              src="/assets/logo/svg/14.svg"
+                              alt="Tacivo AI"
+                              width={32}
+                              height={32}
+                              className="w-full h-full"
+                            />
+                          ) : (
+                            <User className="w-4 h-4" />
+                          )}
+                        </div>
 
-                <div className="flex-1 bg-card border border-border rounded-2xl px-4 py-2">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        sendMessage()
-                      }
-                    }}
-                    placeholder={
-                      voiceControls.isRecording
-                        ? 'Recording...'
-                        : voiceControls.isTranscribing
-                        ? 'Transcribing...'
-                        : 'Type your response or use voice input...'
-                    }
-                    className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground"
-                    style={{ minHeight: '48px', maxHeight: '144px' }}
-                    disabled={isLoading}
-                  />
+                        {/* Message Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-foreground">
+                              {message.role === 'assistant' ? 'Tacivo AI' : userProfile?.full_name?.split(' ')[0] || 'You'}
+                            </span>
+                            {/* Replay button for AI messages */}
+                            {message.role === 'assistant' && (
+                              <button
+                                onClick={() => voiceControls.playText(message.content)}
+                                disabled={voiceControls.isPlaying}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-accent hover:bg-accent/10 transition-all disabled:opacity-50"
+                                title="Play this message"
+                              >
+                                <Volume2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                            {message.content}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  {/* Typing Indicator */}
+                  {isTyping && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex gap-3 py-4 px-3"
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden">
+                        <Image
+                          src="/assets/logo/svg/14.svg"
+                          alt="Tacivo AI"
+                          width={32}
+                          height={32}
+                          className="w-full h-full"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 py-2">
+                        <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </motion.div>
+                  )}
+
+                  <div ref={messagesEndRef} />
                 </div>
-                <button
-                  onClick={sendMessage}
-                  disabled={isLoading || !inputMessage.trim()}
-                  className="px-6 py-3 bg-accent text-accent-foreground rounded-2xl font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 h-[48px]"
-                >
-                  <Send className="w-5 h-5" />
-                  Send
-                </button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                Press Enter to send, Shift+Enter for new line • Click mic for voice input
-              </p>
+
+              {/* Input Area - Fixed at Bottom */}
+              <div className="border-t border-border/50 bg-background">
+                <div className="max-w-3xl mx-auto px-6 py-4">
+                  <div className="relative flex items-end gap-2 bg-muted/30 border border-border/50 rounded-2xl p-2 focus-within:border-accent/50 focus-within:bg-muted/50 transition-all">
+                    {/* Voice Input Button */}
+                    <button
+                      onClick={async () => {
+                        if (voiceControls.isRecording) {
+                          try {
+                            const transcribedText = await voiceControls.stopRecording()
+                            setInputMessage(prev => {
+                              const newText = prev ? `${prev} ${transcribedText}` : transcribedText
+                              return newText.trim()
+                            })
+                          } catch (error) {
+                            console.error('Failed to transcribe:', error)
+                          }
+                        } else {
+                          await voiceControls.startRecording()
+                        }
+                      }}
+                      disabled={voiceControls.isTranscribing}
+                      className={`flex-shrink-0 p-2.5 rounded-xl transition-all ${
+                        voiceControls.isRecording
+                          ? 'bg-red-500/10 text-red-500'
+                          : voiceControls.isTranscribing
+                          ? 'bg-accent/10 text-accent'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
+                      title={voiceControls.isRecording ? 'Stop recording' : 'Voice input'}
+                    >
+                      {voiceControls.isRecording ? (
+                        <StopCircle className="w-5 h-5" />
+                      ) : (
+                        <Mic className="w-5 h-5" />
+                      )}
+                    </button>
+
+                    {/* Text Input */}
+                    <textarea
+                      ref={textareaRef}
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
+                      placeholder={
+                        voiceControls.isRecording
+                          ? 'Listening...'
+                          : voiceControls.isTranscribing
+                          ? 'Transcribing...'
+                          : 'Share your experience...'
+                      }
+                      className="flex-1 bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground text-[15px] py-2 px-1"
+                      style={{ minHeight: '44px', maxHeight: '120px' }}
+                      disabled={isLoading}
+                    />
+
+                    {/* Send Button */}
+                    <button
+                      onClick={sendMessage}
+                      disabled={isLoading || !inputMessage.trim()}
+                      className={`flex-shrink-0 p-2.5 rounded-xl transition-all ${
+                        inputMessage.trim()
+                          ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                          : 'text-muted-foreground'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/70 mt-2 text-center">
+                    Enter to send · Shift+Enter for new line · Hold T to speak
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Help Modal */}
+        <AnimatePresence>
+          {showHelpModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowHelpModal(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.2 }}
+                className="bg-card border border-border rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-foreground">How This Works</h3>
+                    <button
+                      onClick={() => setShowHelpModal(false)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 text-sm text-foreground/80">
+                    <div>
+                      <h4 className="font-medium text-foreground mb-1">What is this interview?</h4>
+                      <p>This is an AI-powered knowledge capture session. You share your expertise through a conversational interview, and we transform it into a structured case study document.</p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-foreground mb-1">Who is the AI?</h4>
+                      <p>Tacivo is your interview assistant. It asks thoughtful questions to help you articulate your experience clearly and thoroughly.</p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-foreground mb-1">What happens at 100%?</h4>
+                      <p>Once you reach 100% progress, the &quot;Generate Case Study&quot; button appears. Click it to create a professional document from your interview.</p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-foreground mb-1">How long does it take?</h4>
+                      <p>A typical interview takes 10-15 exchanges. The depth of conversation ensures your case study captures the nuances and insights that make your experience valuable.</p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-foreground mb-1">Tips</h4>
+                      <ul className="list-disc list-inside space-y-1 text-foreground/70">
+                        <li>Use voice input for natural conversation</li>
+                        <li>Share specific examples and outcomes</li>
+                        <li>Include challenges and how you overcame them</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-6 py-4 bg-muted/30 border-t border-border">
+                  <button
+                    onClick={() => setShowHelpModal(false)}
+                    className="w-full py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   )

@@ -225,12 +225,14 @@ export interface Database {
           id: string
           interview_id: string
           user_id: string
+          organization_id: string | null
           title: string
           content: string
           document_type: 'case-study' | 'best-practices'
           format: 'markdown' | 'pdf'| 'blocknote'
           file_url: string | null
           is_shared: boolean
+          plain_text: string | null
           created_at: string
           updated_at: string
         }
@@ -238,12 +240,14 @@ export interface Database {
           id?: string
           interview_id: string
           user_id: string
+          organization_id?: string | null
           title: string
           content: string
           document_type: 'case-study' | 'best-practices'
           format?: 'markdown' | 'pdf'| 'blocknote'
           file_url?: string | null
           is_shared?: boolean
+          plain_text?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -251,12 +255,14 @@ export interface Database {
           id?: string
           interview_id?: string
           user_id?: string
+          organization_id?: string | null
           title?: string
           content?: string
           document_type?: 'case-study' | 'best-practices'
           format?: 'markdown' | 'pdf'| 'blocknote'
           file_url?: string | null
           is_shared?: boolean
+          plain_text?: string | null
           created_at?: string
           updated_at?: string
         }
