@@ -9,9 +9,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { playbookId, documentIds, newDocumentIds, additionalContext, userId } = body;
+    const { playbookId, uploadedContent, uploadedTitle, documentIds, newDocumentIds, additionalContext, userId } = body;
 
-    if (!playbookId) {
+    // Handle uploaded file case - create new playbook from uploaded content
+    const isUploadedFile = !!uploadedContent;
+
+    if (!isUploadedFile && !playbookId) {
       return NextResponse.json(
         { error: 'Playbook ID is required' },
         { status: 400 }
@@ -34,52 +37,64 @@ export async function POST(req: NextRequest) {
 
     const supabase = supabaseAdmin;
 
-    // Fetch the existing playbook
-    const { data: playbook, error: playbookError } = await supabase
-      .from('playbooks')
-      .select('*')
-      .eq('id', playbookId)
-      .single();
+    let playbookData: any = null;
 
-    if (playbookError || !playbook) {
-      console.error('Error fetching playbook:', playbookError);
-      return NextResponse.json(
-        { error: 'Playbook not found' },
-        { status: 404 }
-      );
-    }
-
-    // Cast to any to avoid TypeScript errors with Supabase types
-    const playbookData = playbook as any;
-
-    // Verify ownership
-    if (playbookData.user_id !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized to update this playbook' },
-        { status: 403 }
-      );
-    }
-
-    // If there are no new documents and no additional context, return early
-    if ((!newDocumentIds || newDocumentIds.length === 0) && !additionalContext) {
-      // Just update the document_ids array
-      const { error: updateError } = await (supabase as any)
+    if (isUploadedFile) {
+      // For uploaded files, create a temporary playbook data object
+      playbookData = {
+        title: uploadedTitle || 'Uploaded Playbook',
+        type: 'sales-playbook', // Default type for uploaded playbooks
+        content: uploadedContent,
+        user_id: userId
+      };
+    } else {
+      // Fetch the existing playbook
+      const { data: playbook, error: playbookError } = await supabase
         .from('playbooks')
-        .update({
-          document_ids: documentIds,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', playbookId);
+        .select('*')
+        .eq('id', playbookId)
+        .single();
 
-      if (updateError) {
-        console.error('Error updating playbook:', updateError);
-        throw updateError;
+      if (playbookError || !playbook) {
+        console.error('Error fetching playbook:', playbookError);
+        return NextResponse.json(
+          { error: 'Playbook not found' },
+          { status: 404 }
+        );
       }
 
-      return NextResponse.json({
-        success: true,
-        message: 'Playbook document list updated'
-      });
+      // Cast to any to avoid TypeScript errors with Supabase types
+      playbookData = playbook as any;
+
+      // Verify ownership
+      if (playbookData.user_id !== userId) {
+        return NextResponse.json(
+          { error: 'Unauthorized to update this playbook' },
+          { status: 403 }
+        );
+      }
+
+      // If there are no new documents and no additional context, return early
+      if ((!newDocumentIds || newDocumentIds.length === 0) && !additionalContext) {
+        // Just update the document_ids array
+        const { error: updateError } = await (supabase as any)
+          .from('playbooks')
+          .update({
+            document_ids: documentIds,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', playbookId);
+
+        if (updateError) {
+          console.error('Error updating playbook:', updateError);
+          throw updateError;
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: 'Playbook document list updated'
+        });
+      }
     }
 
     // Fetch new documents if any
@@ -205,27 +220,57 @@ Return ONLY the complete updated playbook content (not the title, just the conte
 
     console.log(`Successfully updated playbook. New length: ${updatedContent.length} characters`);
 
-    // Update the playbook in the database
-    const { error: updateError } = await (supabase as any)
-      .from('playbooks')
-      .update({
-        content: updatedContent,
-        document_ids: documentIds,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', playbookId);
+    if (isUploadedFile) {
+      // Create a new playbook from uploaded content
+      const { data: newPlaybook, error: insertError } = await (supabase as any)
+        .from('playbooks')
+        .insert({
+          title: playbookData.title,
+          type: playbookData.type,
+          content: updatedContent,
+          document_ids: documentIds,
+          user_id: userId,
+          is_shared: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    if (updateError) {
-      console.error('Error updating playbook in database:', updateError);
-      throw updateError;
+      if (insertError) {
+        console.error('Error creating playbook in database:', insertError);
+        throw insertError;
+      }
+
+      return NextResponse.json({
+        success: true,
+        playbookId: newPlaybook.id,
+        updatedAt: new Date().toISOString(),
+        newExperiencesAdded: documentIds?.length || 0
+      });
+    } else {
+      // Update the existing playbook in the database
+      const { error: updateError } = await (supabase as any)
+        .from('playbooks')
+        .update({
+          content: updatedContent,
+          document_ids: documentIds,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', playbookId);
+
+      if (updateError) {
+        console.error('Error updating playbook in database:', updateError);
+        throw updateError;
+      }
+
+      return NextResponse.json({
+        success: true,
+        playbookId: playbookId,
+        updatedAt: new Date().toISOString(),
+        newExperiencesAdded: newDocumentIds?.length || 0
+      });
     }
-
-    return NextResponse.json({
-      success: true,
-      playbookId: playbookId,
-      updatedAt: new Date().toISOString(),
-      newExperiencesAdded: newDocumentIds?.length || 0
-    });
 
   } catch (error) {
     console.error('Error updating playbook:', error);
