@@ -35,6 +35,8 @@ export default function PlaybooksPage() {
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
   const [generationType, setGenerationType] = useState<GenerationType>('sales-playbook')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generationStatus, setGenerationStatus] = useState('')
+  const [displayedStatus, setDisplayedStatus] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [playbookTitle, setPlaybookTitle] = useState('')
 
@@ -120,10 +122,54 @@ export default function PlaybooksPage() {
     }
   }
 
+  const generationMessages = [
+    'Analyzing selected experiences...',
+    'Extracting key insights and patterns...',
+    'Identifying best practices...',
+    'Synthesizing knowledge across documents...',
+    'Structuring the playbook...',
+    'Writing executive summary...',
+    'Generating actionable frameworks...',
+    'Adding practical examples...',
+    'Finalizing content...',
+    'Almost there...',
+  ]
+
+  // Typewriter effect for status messages
+  useEffect(() => {
+    if (!generationStatus) {
+      setDisplayedStatus('')
+      return
+    }
+
+    setDisplayedStatus('')
+    let currentIndex = 0
+
+    const typeInterval = setInterval(() => {
+      if (currentIndex < generationStatus.length) {
+        setDisplayedStatus(generationStatus.slice(0, currentIndex + 1))
+        currentIndex++
+      } else {
+        clearInterval(typeInterval)
+      }
+    }, 30)
+
+    return () => clearInterval(typeInterval)
+  }, [generationStatus])
+
   const handleGenerate = async () => {
     if (selectedDocuments.size < 2) return
 
     setIsGenerating(true)
+    setGenerationStatus(generationMessages[0])
+
+    // Cycle through status messages
+    let messageIndex = 0
+    const statusInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % generationMessages.length
+      setGenerationStatus(generationMessages[messageIndex])
+    }, 3000)
+
     try {
       // Get current user ID
       const { data: { user } } = await supabase.auth.getUser()
@@ -159,19 +205,23 @@ export default function PlaybooksPage() {
       if (result.error) {
         alert(`Generation failed: ${result.error}`)
       } else {
-        alert('Playbook generated and saved successfully!')
+        setGenerationStatus('Playbook created successfully!')
         // Clear selections
         setSelectedDocuments(new Set())
         setPlaybookTitle('')
         // Redirect to shared playbooks page to view the generated playbook
-        router.push('/platform/shared-playbooks')
+        setTimeout(() => {
+          router.push('/platform/shared-playbooks')
+        }, 500)
       }
 
     } catch (error) {
       console.error('Error generating playbook:', error)
       alert('Failed to generate playbook. Please try again.')
     } finally {
+      clearInterval(statusInterval)
       setIsGenerating(false)
+      setGenerationStatus('')
     }
   }
 
@@ -235,7 +285,22 @@ export default function PlaybooksPage() {
       </div>
 
       {/* Generation Controls */}
-      <div className="bg-card rounded-xl border border-border p-6 mb-8">
+      <div className={`bg-card rounded-xl border p-6 mb-8 transition-colors ${isGenerating ? 'border-accent/50 bg-accent/5' : 'border-border'}`}>
+        {/* Generation Progress Banner */}
+        {isGenerating && (
+          <div className="mb-6 p-4 bg-accent/10 rounded-lg border border-accent/20">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-accent animate-spin flex-shrink-0" />
+              <div className="overflow-hidden">
+                <p className="font-medium text-foreground">Generating your playbook...</p>
+                <p className="text-sm text-muted-foreground">
+                  {displayedStatus}
+                  <span className="inline-block w-0.5 h-4 bg-muted-foreground ml-0.5 animate-pulse" />
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Selection Summary */}
           <div className="flex-1">

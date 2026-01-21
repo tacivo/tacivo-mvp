@@ -2,6 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
+// Extend timeout for playbook generation (requires Vercel Pro for >60s)
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,

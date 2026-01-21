@@ -154,6 +154,62 @@ function ExperiencePageContent() {
   const [interviewProgress, setInterviewProgress] = useState(0)
   const [isEndingInterview, setIsEndingInterview] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
+  const [generationStatus, setGenerationStatus] = useState('')
+  const [displayedStatus, setDisplayedStatus] = useState('')
+
+  // Status messages for document generation
+  const generationMessages = [
+    'Analyzing your interview responses...',
+    'Extracting key insights and experiences...',
+    'Identifying core themes and patterns...',
+    'Structuring your case study...',
+    'Writing the executive summary...',
+    'Documenting the situation and context...',
+    'Capturing your approach and actions...',
+    'Highlighting outcomes and results...',
+    'Adding lessons learned...',
+    'Finalizing your document...',
+  ]
+
+  // Typewriter effect for status messages
+  useEffect(() => {
+    if (!generationStatus) {
+      setDisplayedStatus('')
+      return
+    }
+
+    setDisplayedStatus('')
+    let currentIndex = 0
+
+    const typeInterval = setInterval(() => {
+      if (currentIndex < generationStatus.length) {
+        setDisplayedStatus(generationStatus.slice(0, currentIndex + 1))
+        currentIndex++
+      } else {
+        clearInterval(typeInterval)
+      }
+    }, 50)
+
+    return () => clearInterval(typeInterval)
+  }, [generationStatus])
+
+  // Rotate through generation messages
+  useEffect(() => {
+    if (!isEndingInterview) {
+      setGenerationStatus('')
+      return
+    }
+
+    let messageIndex = 0
+    setGenerationStatus(generationMessages[0])
+
+    const interval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % generationMessages.length
+      setGenerationStatus(generationMessages[messageIndex])
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [isEndingInterview])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -1181,6 +1237,42 @@ function ExperiencePageContent() {
                   >
                     Got it
                   </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Generation Overlay */}
+        <AnimatePresence>
+          {isEndingInterview && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.2 }}
+                className="bg-card border border-border rounded-2xl shadow-xl max-w-md w-full mx-4 p-8 text-center"
+              >
+                <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
+                  <div className="w-8 h-8 border-3 border-accent border-t-transparent rounded-full animate-spin" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  Generating Your Case Study
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  We're transforming your interview into a professional document
+                </p>
+                <div className="bg-muted/30 rounded-lg p-4 min-h-[48px] flex items-center justify-center">
+                  <p className="text-sm text-foreground">
+                    {displayedStatus}
+                    <span className="inline-block w-0.5 h-4 bg-accent ml-0.5 animate-pulse" />
+                  </p>
                 </div>
               </motion.div>
             </motion.div>
