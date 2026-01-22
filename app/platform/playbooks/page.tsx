@@ -165,13 +165,6 @@ export default function PlaybooksPage() {
     setIsGenerating(true)
     setGenerationStatus(generationMessages[0])
 
-    // Cycle through status messages
-    let messageIndex = 0
-    const statusInterval = setInterval(() => {
-      messageIndex = (messageIndex + 1) % generationMessages.length
-      setGenerationStatus(generationMessages[messageIndex])
-    }, 3000)
-
     try {
       // Get current user ID
       const { data: { user } } = await supabase.auth.getUser()
@@ -196,32 +189,58 @@ export default function PlaybooksPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate playbook')
+        throw new Error('Failed to generate playbook')
       }
 
-      const result = await response.json()
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response stream')
+      }
 
-      console.log('Generated playbook:', result)
+      const decoder = new TextDecoder()
+      let buffer = ''
 
-      if (result.error) {
-        alert(`Generation failed: ${result.error}`)
-      } else {
-        setGenerationStatus('Playbook created successfully!')
-        // Clear selections
-        setSelectedDocuments(new Set())
-        setPlaybookTitle('')
-        // Redirect to shared playbooks page to view the generated playbook
-        setTimeout(() => {
-          router.push('/platform/shared-playbooks')
-        }, 500)
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Parse SSE events from buffer
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+        let eventType = ''
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7)
+          } else if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6))
+
+            if (eventType === 'status') {
+              setGenerationStatus(data.message)
+            } else if (eventType === 'error') {
+              throw new Error(data.error)
+            } else if (eventType === 'complete') {
+              console.log('Generated playbook:', data)
+              setGenerationStatus('Playbook created successfully!')
+              // Clear selections
+              setSelectedDocuments(new Set())
+              setPlaybookTitle('')
+              // Redirect to shared playbooks page to view the generated playbook
+              setTimeout(() => {
+                router.push('/platform/shared-playbooks')
+              }, 500)
+            }
+          }
+        }
       }
 
     } catch (error) {
       console.error('Error generating playbook:', error)
-      alert('Failed to generate playbook. Please try again.')
+      alert(error instanceof Error ? error.message : 'Failed to generate playbook. Please try again.')
     } finally {
-      clearInterval(statusInterval)
       setIsGenerating(false)
       setGenerationStatus('')
     }

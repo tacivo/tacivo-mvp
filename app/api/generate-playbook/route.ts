@@ -1,93 +1,105 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
-// Extend timeout for playbook generation (requires Vercel Pro for >60s)
-export const maxDuration = 60;
+// Extend timeout for playbook generation
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
+  const encoder = new TextEncoder();
 
-  try {
-    const { documentIds, type, title, savePlaybook, userId } = await req.json();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const sendEvent = (event: string, data: any) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      };
 
-    console.log('Playbook generation request:', {
-      documentCount: documentIds?.length,
-      type,
-      hasTitle: !!title,
-      shouldSave: savePlaybook,
-      userId: userId
-    });
+      try {
+        const anthropic = new Anthropic({
+          apiKey: process.env.ANTHROPIC_API_KEY,
+        });
 
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
-      return NextResponse.json(
-        { error: 'At least 2 documents must be selected' },
-        { status: 400 }
-      );
-    }
+        const { documentIds, type, title, savePlaybook, userId } = await req.json();
 
-    if (!type || !['sales-playbook', 'customer-success-guide', 'operational-procedures', 'strategic-planning-document'].includes(type)) {
-      return NextResponse.json(
-        { error: 'Invalid generation type' },
-        { status: 400 }
-      );
-    }
+        console.log('Playbook generation request:', {
+          documentCount: documentIds?.length,
+          type,
+          hasTitle: !!title,
+          shouldSave: savePlaybook,
+          userId: userId
+        });
 
-    const supabase = supabaseAdmin;
+        sendEvent('status', { message: 'Validating request...' });
 
-    // Fetch all selected documents with plain text
-    const { data: documents, error } = await supabase
-      .from('documents')
-      .select(`
-        *,
-        profiles:user_id (
-          full_name,
-          role,
-          years_of_experience
-        )
-      `)
-      .in('id', documentIds);
+        if (!documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
+          sendEvent('error', { error: 'At least 2 documents must be selected' });
+          controller.close();
+          return;
+        }
 
-    if (error) {
-      console.error('Database error fetching documents:', error);
-      throw error;
-    }
+        if (!type || !['sales-playbook', 'customer-success-guide', 'operational-procedures', 'strategic-planning-document'].includes(type)) {
+          sendEvent('error', { error: 'Invalid generation type' });
+          controller.close();
+          return;
+        }
 
-    console.log(`Fetched ${documents?.length || 0} documents for IDs:`, documentIds);
-    console.log('Document details:', documents?.map((d: any) => ({
-      id: d.id,
-      title: d.title,
-      plainTextLength: d.plain_text?.length || 0,
-      hasPlainText: !!(d.plain_text && d.plain_text.trim())
-    })));
+        const supabase = supabaseAdmin;
 
-    if (!documents || documents.length === 0) {
-      console.error(`No documents found for IDs:`, documentIds);
-      return NextResponse.json(
-        { error: 'No documents found. Please ensure you have completed interviews and generated documents.' },
-        { status: 404 }
-      );
-    }
+        sendEvent('status', { message: 'Fetching documents...' });
 
-    // Check if documents have plain_text and filter out empty ones
-    const validDocuments = documents.filter((doc: any) => doc.plain_text && doc.plain_text.trim().length > 0);
+        // Fetch all selected documents with plain text
+        const { data: documents, error } = await supabase
+          .from('documents')
+          .select(`
+            *,
+            profiles:user_id (
+              full_name,
+              role,
+              years_of_experience
+            )
+          `)
+          .in('id', documentIds);
 
-    if (validDocuments.length < 2) {
-      return NextResponse.json(
-        { error: `Only ${validDocuments.length} documents have content. Need at least 2 documents with content.` },
-        { status: 400 }
-      );
-    }
+        if (error) {
+          console.error('Database error fetching documents:', error);
+          sendEvent('error', { error: 'Database error fetching documents' });
+          controller.close();
+          return;
+        }
 
-    console.log(`Using plain text from ${validDocuments.length} documents`);
+        console.log(`Fetched ${documents?.length || 0} documents for IDs:`, documentIds);
+        console.log('Document details:', documents?.map((d: any) => ({
+          id: d.id,
+          title: d.title,
+          plainTextLength: d.plain_text?.length || 0,
+          hasPlainText: !!(d.plain_text && d.plain_text.trim())
+        })));
 
-    // Combine all document plain text content
-    const combinedContent = validDocuments.map((doc: any) => {
-      const profile = doc.profiles;
+        if (!documents || documents.length === 0) {
+          console.error(`No documents found for IDs:`, documentIds);
+          sendEvent('error', { error: 'No documents found. Please ensure you have completed interviews and generated documents.' });
+          controller.close();
+          return;
+        }
 
-      return `=== ${doc.title} ===
+        // Check if documents have plain_text and filter out empty ones
+        const validDocuments = documents.filter((doc: any) => doc.plain_text && doc.plain_text.trim().length > 0);
+
+        if (validDocuments.length < 2) {
+          sendEvent('error', { error: `Only ${validDocuments.length} documents have content. Need at least 2 documents with content.` });
+          controller.close();
+          return;
+        }
+
+        console.log(`Using plain text from ${validDocuments.length} documents`);
+
+        sendEvent('status', { message: 'Analyzing selected experiences...' });
+
+        // Combine all document plain text content
+        const combinedContent = validDocuments.map((doc: any) => {
+          const profile = doc.profiles;
+
+          return `=== ${doc.title} ===
 
 Author: ${profile?.full_name || 'Unknown'} (${profile?.role || 'Unknown role'})
 Type: ${doc.document_type}
@@ -96,15 +108,17 @@ Content:
 ${doc.plain_text}
 
 ---`;
-    }).join('\n\n');
+        }).join('\n\n');
 
-    console.log(`Generating ${type} from ${validDocuments.length} documents. Total content length: ${combinedContent.length} characters`);
+        console.log(`Generating ${type} from ${validDocuments.length} documents. Total content length: ${combinedContent.length} characters`);
 
-    // Create generation prompt based on type
-    let prompt = '';
-    switch (type) {
-      case 'sales-playbook':
-        prompt = `You are creating a comprehensive sales playbook by synthesizing insights from ${validDocuments.length} different experiences and best practices.
+        sendEvent('status', { message: 'Extracting key insights and patterns...' });
+
+        // Create generation prompt based on type
+        let prompt = '';
+        switch (type) {
+          case 'sales-playbook':
+            prompt = `You are creating a comprehensive sales playbook by synthesizing insights from ${validDocuments.length} different experiences and best practices.
 
 === YOUR TASK ===
 
@@ -174,10 +188,10 @@ LENGTH: 5-8 pages. Be thorough but practical.
 
 ---
 *Generated from sales experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
-        break;
+            break;
 
-      case 'customer-success-guide':
-        prompt = `You are creating a customer success guide by synthesizing insights from ${validDocuments.length} different experiences.
+          case 'customer-success-guide':
+            prompt = `You are creating a customer success guide by synthesizing insights from ${validDocuments.length} different experiences.
 
 === YOUR TASK ===
 
@@ -237,10 +251,10 @@ LENGTH: 4-6 pages maximum. Be practical and focused on outcomes.
 
 ---
 *Compiled from customer success experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
-        break;
+            break;
 
-      case 'operational-procedures':
-        prompt = `You are creating operational procedures by synthesizing insights from ${validDocuments.length} different experiences.
+          case 'operational-procedures':
+            prompt = `You are creating operational procedures by synthesizing insights from ${validDocuments.length} different experiences.
 
 === YOUR TASK ===
 
@@ -300,10 +314,10 @@ LENGTH: 6-8 pages.
 
 ---
 *Based on operational experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
-        break;
+            break;
 
-      case 'strategic-planning-document':
-        prompt = `You are creating a strategic planning document by synthesizing insights from ${validDocuments.length} different experiences.
+          case 'strategic-planning-document':
+            prompt = `You are creating a strategic planning document by synthesizing insights from ${validDocuments.length} different experiences.
 
 === YOUR TASK ===
 
@@ -367,241 +381,267 @@ LENGTH: 6-10 pages.
 
 ---
 *Approved based on strategic experiences by: ${validDocuments.map((d: any) => d.profiles?.full_name).filter(Boolean).join(', ')}*`;
-        break;
-    }
+            break;
+        }
 
-    // Use prompt caching to reduce costs when generating multiple playbooks
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 6000,
-      temperature: 0.7,
-      system: [
-        {
-          type: "text",
-          text: `You are an expert at synthesizing multiple case studies and best practices into comprehensive, actionable playbooks. You excel at identifying patterns, extracting nuances, and creating practical frameworks.
+        sendEvent('status', { message: 'Generating playbook content...' });
+
+        // Use streaming to avoid timeout
+        let generatedContent = '';
+
+        const response = await anthropic.messages.stream({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 6000,
+          temperature: 0.7,
+          system: [
+            {
+              type: "text",
+              text: `You are an expert at synthesizing multiple case studies and best practices into comprehensive, actionable playbooks. You excel at identifying patterns, extracting nuances, and creating practical frameworks.
 
 SOURCE DOCUMENTS:
 ${combinedContent}`,
-          cache_control: { type: "ephemeral" }
-        }
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    });
-
-    const generatedContent = response.content[0].type === 'text' ? response.content[0].text : '';
-
-    console.log(`Successfully generated ${type} content of length: ${generatedContent.length} characters`);
-
-    // Convert markdown to BlockNote format
-    const convertMarkdownToBlockNote = (markdown: string) => {
-      const lines = markdown.split('\n');
-      const blocks = [];
-      let blockId = 0;
-
-      for (const line of lines) {
-        if (!line.trim()) {
-          // Empty line - paragraph with empty content
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'paragraph',
-            content: []
-          });
-        } else if (line.startsWith('# ')) {
-          // H1
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'heading',
-            props: { level: 1 },
-            content: [{ type: 'text', text: line.substring(2), styles: {} }]
-          });
-        } else if (line.startsWith('## ')) {
-          // H2
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'heading',
-            props: { level: 2 },
-            content: [{ type: 'text', text: line.substring(3), styles: {} }]
-          });
-        } else if (line.startsWith('### ')) {
-          // H3
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'heading',
-            props: { level: 3 },
-            content: [{ type: 'text', text: line.substring(4), styles: {} }]
-          });
-        } else if (line.startsWith('- ') || line.startsWith('* ')) {
-          // Bullet list item
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'bulletListItem',
-            content: [{ type: 'text', text: line.substring(2), styles: {} }]
-          });
-        } else if (line.match(/^\d+\.\s/)) {
-          // Numbered list item
-          const text = line.replace(/^\d+\.\s/, '');
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'numberedListItem',
-            content: [{ type: 'text', text, styles: {} }]
-          });
-        } else {
-          // Regular paragraph - handle bold and italic
-          let content = line;
-          const parts: Array<{ type: string; text: string; styles: Record<string, boolean> }> = [];
-
-          // Simple parsing for bold (**text**) and italic (*text*)
-          const boldItalicRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|[^*]+)/g;
-          const matches = content.match(boldItalicRegex);
-
-          if (matches) {
-            matches.forEach(match => {
-              if (match.startsWith('**') && match.endsWith('**')) {
-                // Bold
-                parts.push({ type: 'text', text: match.slice(2, -2), styles: { bold: true } });
-              } else if (match.startsWith('*') && match.endsWith('*')) {
-                // Italic
-                parts.push({ type: 'text', text: match.slice(1, -1), styles: { italic: true } });
-              } else if (match) {
-                // Plain text
-                parts.push({ type: 'text', text: match, styles: {} });
-              }
-            });
-          }
-
-          blocks.push({
-            id: `block-${blockId++}`,
-            type: 'paragraph',
-            content: parts.length > 0 ? parts : [{ type: 'text', text: line, styles: {} }]
-          });
-        }
-      }
-
-      return blocks;
-    };
-
-    const blockNoteContent = convertMarkdownToBlockNote(generatedContent);
-
-    // Save playbook to database if requested
-    let savedPlaybook = null;
-    if (savePlaybook && userId) {
-      try {
-        // Get user's organization using admin client
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', userId)
-          .single();
-
-        const profileData = profile as { organization_id: string | null } | null;
-
-        // Generate title if not provided
-        const playbookTitle = title || `${type.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} - ${new Date().toLocaleDateString()}`;
-
-        console.log('Attempting to save playbook:', {
-          title: playbookTitle,
-          userId,
-          organizationId: profileData?.organization_id,
-          documentIdsCount: documentIds.length
+              cache_control: { type: "ephemeral" }
+            }
+          ],
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
         });
 
-        // Insert playbook into database using admin client (bypasses RLS)
-        // Store as BlockNote JSON format
-        const { data: playbook, error: insertError } = await (supabase as any)
-          .from('playbooks')
-          .insert({
-            title: playbookTitle,
-            content: JSON.stringify(blockNoteContent),
-            type,
-            user_id: userId,
-            organization_id: profileData?.organization_id || null,
-            is_shared: true, // Default to shared
-            document_ids: documentIds,
-            content_sections: ['all-content']
-          })
-          .select()
-          .single();
+        // Track progress for status updates
+        let chunkCount = 0;
+        const statusMessages = [
+          'Structuring the playbook...',
+          'Writing executive summary...',
+          'Generating actionable frameworks...',
+          'Adding practical examples...',
+          'Finalizing content...',
+        ];
 
-        if (insertError) {
-          console.error('Error saving playbook:', insertError);
-          console.error('Insert error details:', {
-            message: insertError.message,
-            code: insertError.code,
-            details: insertError.details,
-            hint: insertError.hint
-          });
-          // Don't throw - we still want to return the generated content
-        } else {
-          savedPlaybook = playbook;
-          console.log(`Successfully saved playbook with ID: ${(playbook as any)?.id}`);
+        for await (const event of response) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            generatedContent += event.delta.text;
+            chunkCount++;
+
+            // Send periodic status updates
+            if (chunkCount % 50 === 0) {
+              const statusIndex = Math.min(Math.floor(chunkCount / 100), statusMessages.length - 1);
+              sendEvent('status', { message: statusMessages[statusIndex] });
+            }
+          }
         }
-      } catch (saveError) {
-        // Log but don't fail the entire request if saving fails
-        console.error('Error in playbook save process:', saveError);
-        if (saveError instanceof Error) {
-          console.error('Save error details:', {
-            message: saveError.message,
-            stack: saveError.stack
+
+        console.log(`Successfully generated ${type} content of length: ${generatedContent.length} characters`);
+
+        sendEvent('status', { message: 'Converting to editor format...' });
+
+        // Convert markdown to BlockNote format
+        const convertMarkdownToBlockNote = (markdown: string) => {
+          const lines = markdown.split('\n');
+          const blocks = [];
+          let blockId = 0;
+
+          for (const line of lines) {
+            if (!line.trim()) {
+              // Empty line - paragraph with empty content
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'paragraph',
+                content: []
+              });
+            } else if (line.startsWith('# ')) {
+              // H1
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'heading',
+                props: { level: 1 },
+                content: [{ type: 'text', text: line.substring(2), styles: {} }]
+              });
+            } else if (line.startsWith('## ')) {
+              // H2
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'heading',
+                props: { level: 2 },
+                content: [{ type: 'text', text: line.substring(3), styles: {} }]
+              });
+            } else if (line.startsWith('### ')) {
+              // H3
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'heading',
+                props: { level: 3 },
+                content: [{ type: 'text', text: line.substring(4), styles: {} }]
+              });
+            } else if (line.startsWith('- ') || line.startsWith('* ')) {
+              // Bullet list item
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'bulletListItem',
+                content: [{ type: 'text', text: line.substring(2), styles: {} }]
+              });
+            } else if (line.match(/^\d+\.\s/)) {
+              // Numbered list item
+              const text = line.replace(/^\d+\.\s/, '');
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'numberedListItem',
+                content: [{ type: 'text', text, styles: {} }]
+              });
+            } else {
+              // Regular paragraph - handle bold and italic
+              const parts: Array<{ type: string; text: string; styles: Record<string, boolean> }> = [];
+
+              // Simple parsing for bold (**text**) and italic (*text*)
+              const boldItalicRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|[^*]+)/g;
+              const matches = line.match(boldItalicRegex);
+
+              if (matches) {
+                matches.forEach(match => {
+                  if (match.startsWith('**') && match.endsWith('**')) {
+                    // Bold
+                    parts.push({ type: 'text', text: match.slice(2, -2), styles: { bold: true } });
+                  } else if (match.startsWith('*') && match.endsWith('*')) {
+                    // Italic
+                    parts.push({ type: 'text', text: match.slice(1, -1), styles: { italic: true } });
+                  } else if (match) {
+                    // Plain text
+                    parts.push({ type: 'text', text: match, styles: {} });
+                  }
+                });
+              }
+
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'paragraph',
+                content: parts.length > 0 ? parts : [{ type: 'text', text: line, styles: {} }]
+              });
+            }
+          }
+
+          return blocks;
+        };
+
+        const blockNoteContent = convertMarkdownToBlockNote(generatedContent);
+
+        // Save playbook to database if requested
+        let savedPlaybook = null;
+        if (savePlaybook && userId) {
+          try {
+            sendEvent('status', { message: 'Saving playbook...' });
+
+            // Get user's organization using admin client
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('organization_id')
+              .eq('id', userId)
+              .single();
+
+            const profileData = profile as { organization_id: string | null } | null;
+
+            // Generate title if not provided
+            const playbookTitle = title || `${type.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} - ${new Date().toLocaleDateString()}`;
+
+            console.log('Attempting to save playbook:', {
+              title: playbookTitle,
+              userId,
+              organizationId: profileData?.organization_id,
+              documentIdsCount: documentIds.length
+            });
+
+            // Insert playbook into database using admin client (bypasses RLS)
+            // Store as BlockNote JSON format
+            const { data: playbook, error: insertError } = await (supabase as any)
+              .from('playbooks')
+              .insert({
+                title: playbookTitle,
+                content: JSON.stringify(blockNoteContent),
+                type,
+                user_id: userId,
+                organization_id: profileData?.organization_id || null,
+                is_shared: true, // Default to shared
+                document_ids: documentIds,
+                content_sections: ['all-content']
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error('Error saving playbook:', insertError);
+              console.error('Insert error details:', {
+                message: insertError.message,
+                code: insertError.code,
+                details: insertError.details,
+                hint: insertError.hint
+              });
+              // Don't throw - we still want to return the generated content
+            } else {
+              savedPlaybook = playbook;
+              console.log(`Successfully saved playbook with ID: ${(playbook as any)?.id}`);
+            }
+          } catch (saveError) {
+            // Log but don't fail the entire request if saving fails
+            console.error('Error in playbook save process:', saveError);
+            if (saveError instanceof Error) {
+              console.error('Save error details:', {
+                message: saveError.message,
+                stack: saveError.stack
+              });
+            }
+          }
+        } else if (savePlaybook && !userId) {
+          console.error('Cannot save playbook: userId not provided in request');
+        }
+
+        // Send final success event
+        sendEvent('complete', {
+          content: generatedContent,
+          type,
+          sourceDocuments: validDocuments.length,
+          generatedAt: new Date().toISOString(),
+          playbook: savedPlaybook
+        });
+
+        controller.close();
+
+      } catch (error) {
+        console.error('Error generating playbook:', error);
+
+        // Log full error details for debugging
+        if (error instanceof Error) {
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
           });
         }
-      }
-    } else if (savePlaybook && !userId) {
-      console.error('Cannot save playbook: userId not provided in request');
-    }
 
-    return NextResponse.json({
-      content: generatedContent,
-      type,
-      sourceDocuments: validDocuments.length,
-      generatedAt: new Date().toISOString(),
-      playbook: savedPlaybook
-    });
+        // Provide more specific error messages
+        let errorMessage = 'Failed to generate content. Please try again.';
+        if (error instanceof Error) {
+          if (error.message.includes('API key')) {
+            errorMessage = 'AI service configuration error. Please contact support.';
+          } else if (error.message.includes('token')) {
+            errorMessage = 'Content too long. Try selecting fewer or shorter documents.';
+          } else if (error.message.includes('rate limit')) {
+            errorMessage = 'AI service rate limit exceeded. Please try again later.';
+          }
+        }
 
-  } catch (error) {
-    console.error('Error generating playbook:', error);
-
-    // Log full error details for debugging
-    if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-    }
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('API key')) {
-        return NextResponse.json(
-          { error: 'AI service configuration error. Please contact support.' },
-          { status: 500 }
-        );
-      }
-      if (error.message.includes('token')) {
-        return NextResponse.json(
-          { error: 'Content too long. Try selecting fewer or shorter documents.' },
-          { status: 400 }
-        );
-      }
-      if (error.message.includes('rate limit')) {
-        return NextResponse.json(
-          { error: 'AI service rate limit exceeded. Please try again later.' },
-          { status: 429 }
-        );
+        sendEvent('error', { error: errorMessage });
+        controller.close();
       }
     }
+  });
 
-    return NextResponse.json(
-      {
-        error: 'Failed to generate content. Please try again.',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 }
