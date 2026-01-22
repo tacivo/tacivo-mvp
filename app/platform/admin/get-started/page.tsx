@@ -239,7 +239,7 @@ export default function AdminGetStartedPage() {
         </div>
 
         {/* Information Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Understanding Experts */}
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -285,6 +285,41 @@ export default function AdminGetStartedPage() {
           </div>
         </div>
 
+        {/* Experiences & Playbooks Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          {/* What are Experiences */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <BookOpen className="w-6 h-6 text-accent" />
+              <h3 className="text-lg font-semibold text-foreground">What are Experiences?</h3>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p className="text-base">
+                AI-generated documents that capture tacit knowledge through conversational interviews with experts.
+              </p>
+              <p className="text-xs italic">
+                Structured for "learn by experience" - real scenarios, challenges, and solutions.
+              </p>
+            </div>
+          </div>
+
+          {/* What are Playbooks */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <FileText className="w-6 h-6 text-accent" />
+              <h3 className="text-lg font-semibold text-foreground">What are Playbooks?</h3>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p className="text-base">
+                AI-synthesized guides that find patterns across multiple experiences to create best practices.
+              </p>
+              <p className="text-xs italic">
+                Generated automatically as experiences grow, or created manually on demand.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Platform Sections Overview */}
         <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl border border-accent/20 p-8">
           <div className="flex items-center gap-3 mb-6">
@@ -306,14 +341,14 @@ export default function AdminGetStartedPage() {
               </ul>
             </div>
 
-            {/* Collective Section */}
+            {/* Shared Section */}
             <div className="bg-background/80 rounded-lg p-5">
-              <h4 className="font-semibold text-foreground mb-2">Collective</h4>
+              <h4 className="font-semibold text-foreground mb-2">Shared</h4>
               <p className="text-sm text-muted-foreground mb-3">
-                Shared knowledge base accessible to all team members
+                Institutional knowledge base accessible to all team members
               </p>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Experiences (shared documents)</li>
+                <li>• Experiences (case studies)</li>
                 <li>• Playbooks (best practices)</li>
                 <li>• Experts directory</li>
               </ul>

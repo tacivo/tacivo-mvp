@@ -13,13 +13,14 @@ import {
   LightBulbIcon,
   BookOpenIcon,
   UserGroupIcon,
-  Cog6ToothIcon,
   MagnifyingGlassIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   UserIcon,
   ShieldCheckIcon,
-  PlusIcon
+  PlusIcon,
+  PencilSquareIcon,
+  Squares2X2Icon
 } from '@heroicons/react/24/outline'
 
 interface PlatformLayoutProps {
@@ -85,16 +86,22 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
     { icon: ClockIcon, label: 'Started Sessions', href: '/platform/sessions/started' },
     { icon: CheckCircleIcon, label: 'Completed Sessions', href: '/platform/sessions/completed' },
     { icon: PlusIcon, label: 'Start New', href: '/interview' },
+    { icon: BookOpenIcon, label: 'Create Playbook', href: '/platform/playbooks' },
+    { icon: PencilSquareIcon, label: 'Update Playbook', href: '/platform/playbooks/update' },
   ]
 
   const collectiveItems = [
     { icon: LightBulbIcon, label: 'Experiences', href: '/platform/experiences' },
-    { icon: BookOpenIcon, label: 'Playbooks', href: '/platform/playbooks' },
+    { icon: Squares2X2Icon, label: 'Playbooks', href: '/platform/shared-playbooks' },
     { icon: UserGroupIcon, label: 'Experts', href: '/platform/experts' },
   ]
 
   const isActive = (href: string) => {
     if (href === '/platform') {
+      return pathname === href
+    }
+    // Exact match for paths that have sub-paths
+    if (href === '/platform/playbooks') {
       return pathname === href
     }
     return pathname.startsWith(href)
@@ -207,7 +214,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
               ) : (
                 <ChevronRightIcon className="w-3 h-3" />
               )}
-              Public Database
+Shared
             </button>
             {collectiveExpanded && (
               <div className="mt-1 space-y-1">

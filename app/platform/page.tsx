@@ -3,10 +3,23 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Plus, FileText, Clock, CheckCircle, Play, Eye, User, Users } from 'lucide-react'
+import { Plus, FileText, Clock, CheckCircle, Play, Eye, User, Users, BookOpen, Globe, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getUserStats, getUserInterviews, getUserDocuments, getSharedCompanyDocuments } from '@/lib/supabase/interviews'
 import { Profile, Interview, Document } from '@/types/database.types'
+
+type PlaybookWithProfile = {
+  id: string
+  title: string
+  type: string
+  created_at: string
+  is_shared: boolean
+  user_id: string
+  profiles?: {
+    full_name: string | null
+    role: string | null
+  }
+}
 
 export default function PlatformHomePage() {
   const router = useRouter()
@@ -14,6 +27,7 @@ export default function PlatformHomePage() {
   const [interviews, setInterviews] = useState<Interview[]>([])
   const [documents, setDocuments] = useState<Document[]>([])
   const [sharedDocs, setSharedDocs] = useState<any[]>([])
+  const [playbooks, setPlaybooks] = useState<PlaybookWithProfile[]>([])
   const [stats, setStats] = useState({
     totalInterviews: 0,
     completedInterviews: 0,
@@ -41,9 +55,28 @@ export default function PlatformHomePage() {
           organization:organizations(name)
         `)
         .eq('id', user.id)
-        .single()
+        .single() as { data: Profile & { organization_id: string | null } | null }
 
       setProfile(profileData)
+
+      // Fetch playbooks (both own and shared from organization)
+      const { data: playbooksData } = await (supabase as any)
+        .from('playbooks')
+        .select(`
+          id,
+          title,
+          type,
+          created_at,
+          is_shared,
+          user_id,
+          profiles:user_id (
+            full_name,
+            role
+          )
+        `)
+        .or(`user_id.eq.${user.id},and(is_shared.eq.true,organization_id.eq.${profileData?.organization_id || 'null'})`)
+        .order('created_at', { ascending: false })
+        .limit(3)
 
       // Fetch stats and recent data
       const [statsData, interviewsData, documentsData, sharedDocsData] = await Promise.all([
@@ -57,6 +90,7 @@ export default function PlatformHomePage() {
       setInterviews(interviewsData.slice(0, 5))
       setDocuments(documentsData.slice(0, 5))
       setSharedDocs(sharedDocsData.slice(0, 3))
+      setPlaybooks(playbooksData || [])
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -73,12 +107,26 @@ export default function PlatformHomePage() {
     })
   }
 
+  const getPlaybookTypeLabel = (type: string) => {
+    switch (type) {
+      case 'sales-playbook': return 'Sales Playbook'
+      case 'customer-success-guide': return 'Customer Success'
+      case 'operational-procedures': return 'Operations'
+      case 'strategic-planning-document': return 'Strategy'
+      default: return type
+    }
+  }
+
   const handleStartInterview = () => {
     router.push('/interview')
   }
 
   const handleViewDocument = (documentId: string) => {
-    router.push(`/documents/${documentId}`)
+    router.push(`/platform/sessions/completed/${documentId}`)
+  }
+
+  const handleViewSharedDocument = (documentId: string) => {
+    router.push(`/platform/experiences/${documentId}`)
   }
 
   const handleResumeInterview = (interviewId: string) => {
@@ -113,12 +161,12 @@ export default function PlatformHomePage() {
         <div className="grid grid-cols-3 gap-8">
           {/* Main Content - 2 columns */}
           <div className="col-span-2 space-y-8">
-            {/* Your Knowledge Section */}
+            {/* Your Experiences Section */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold text-foreground">Private Database</h2>
+<h2 className="text-2xl font-semibold text-foreground">Your Experiences</h2>
                 <button
-                  onClick={() => router.push('/documents')}
+                  onClick={() => router.push('/platform/sessions/completed')}
                   className="text-sm text-accent hover:underline"
                 >
                   View All →
@@ -169,9 +217,17 @@ export default function PlatformHomePage() {
                               }`}>
                                 {isCompleted ? 'Completed' : 'In Progress'}
                               </span>
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                                {interview.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                              </span>
+                              {document?.is_shared ? (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                                  <Globe className="w-3 h-3" />
+                                  Shared
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground flex items-center gap-1">
+                                  <Lock className="w-3 h-3" />
+                                  Private
+                                </span>
+                              )}
                               {interview.function_area && (
                                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-secondary text-foreground border border-border">
                                   {interview.function_area}
@@ -204,12 +260,12 @@ export default function PlatformHomePage() {
               )}
             </section>
 
-            {/* Collective Knowledge Section */}
+            {/* Recently Shared Experiences Section */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold text-foreground">Public Database</h2>
+<h2 className="text-2xl font-semibold text-foreground">Recently Shared Experiences</h2>
                 <button
-                  onClick={() => router.push('/documents?shared=true')}
+                  onClick={() => router.push('/platform/experiences')}
                   className="text-sm text-accent hover:underline"
                 >
                   View All →
@@ -241,11 +297,14 @@ export default function PlatformHomePage() {
                     ]
                     const colorIndex = ownerProfile?.full_name?.charCodeAt(0) % colors.length || 0
 
+                    // Get the interview to access function_area
+                    const interview = (doc as any).interviews
+
                     return (
                       <div
                         key={doc.id}
                         className="bg-card rounded-lg border border-border p-4 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
-                        onClick={() => handleViewDocument(doc.id)}
+                        onClick={() => handleViewSharedDocument(doc.id)}
                       >
                         <div className="flex items-start gap-4">
                           <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${colors[colorIndex]} flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm`}>
@@ -254,12 +313,14 @@ export default function PlatformHomePage() {
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                 Shared
                               </span>
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                                {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                              </span>
+                              {interview?.function_area && (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-secondary text-foreground border border-border">
+                                  {interview.function_area}
+                                </span>
+                              )}
                             </div>
 
                             <h3 className="font-medium text-foreground mb-1 group-hover:text-accent">
@@ -282,48 +343,137 @@ export default function PlatformHomePage() {
                 </div>
               )}
             </section>
+
+            {/* Playbooks Section */}
+            <section>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-foreground">Playbooks</h2>
+                <button
+                  onClick={() => router.push('/platform/shared-playbooks')}
+                  className="text-sm text-accent hover:underline"
+                >
+                  View All →
+                </button>
+              </div>
+
+              {playbooks.length === 0 ? (
+                <div className="bg-card rounded-xl border border-border p-12 text-center">
+                  <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <p className="text-muted-foreground mb-2">No playbooks created yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    Create playbooks from your experiences
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {playbooks.map((playbook) => (
+                    <div
+                      key={playbook.id}
+                      className="bg-card rounded-lg border border-border p-4 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
+                      onClick={() => router.push('/platform/shared-playbooks')}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                          <BookOpen className="w-5 h-5 text-accent" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+                              {getPlaybookTypeLabel(playbook.type)}
+                            </span>
+                            {playbook.is_shared ? (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                Shared
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground flex items-center gap-1">
+                                <Lock className="w-3 h-3" />
+                                Private
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="font-medium text-foreground mb-1 group-hover:text-accent">
+                            {playbook.title}
+                          </h3>
+
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <User className="w-3 h-3" />
+                            <span>{playbook.profiles?.full_name || profile?.full_name || 'You'}</span>
+                            <span>•</span>
+                            <span>{formatDate(playbook.created_at)}</span>
+                          </div>
+                        </div>
+
+                        <Eye className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors flex-shrink-0 mt-1" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
 
           {/* Right Sidebar - Actions */}
           <div className="space-y-6">
             {/* Start Interview Card */}
-            <div className="bg-accent rounded-xl p-6 text-accent-foreground">
-              <FileText className="w-10 h-10 mb-4 opacity-90" />
-              <h3 className="text-lg font-semibold mb-2">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <FileText className="w-10 h-10 mb-4 text-accent" />
+              <h3 className="text-lg font-semibold mb-2 text-foreground">
                 Capture Knowledge
               </h3>
-              <p className="text-accent-foreground/90 text-sm mb-6">
+              <p className="text-muted-foreground text-sm mb-6">
                 Start a new AI-powered interview to document your expertise
               </p>
+
+              {/* Quick Tips */}
+              <div className="mb-6">
+                <h4 className="font-semibold text-foreground mb-3 text-sm">Quick Tips</h4>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Interviews take 15-30 minutes</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Use voice input for faster responses</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Documents are automatically formatted</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Export as PDF or Markdown anytime</span>
+                  </p>
+                </div>
+              </div>
+
               <button
                 onClick={handleStartInterview}
-                className="w-full px-6 py-3 bg-background text-foreground font-medium rounded-lg hover:bg-background/90 transition-all"
+                className="w-full px-6 py-3 bg-accent text-accent-foreground font-medium rounded-lg hover:bg-accent/90 transition-all"
               >
                 Start Interview
               </button>
             </div>
 
-            {/* Quick Tips */}
+            {/* Create Playbook Card */}
             <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="font-semibold text-foreground mb-4">Quick Tips</h3>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p className="flex items-start gap-2">
-                  <span className="text-accent font-bold">•</span>
-                  <span>Interviews take 15-30 minutes</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-accent font-bold">•</span>
-                  <span>Use voice input for faster responses</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-accent font-bold">•</span>
-                  <span>Documents are automatically formatted</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-accent font-bold">•</span>
-                  <span>Export as PDF or Markdown anytime</span>
-                </p>
-              </div>
+              <BookOpen className="w-10 h-10 mb-4 text-accent" />
+              <h3 className="text-lg font-semibold mb-2 text-foreground">
+                Create Playbook
+              </h3>
+              <p className="text-muted-foreground text-sm mb-6">
+                Synthesize insights from multiple experiences into actionable guides
+              </p>
+              <button
+                onClick={() => router.push('/platform/playbooks')}
+                className="w-full px-6 py-3 bg-accent text-accent-foreground font-medium rounded-lg hover:bg-accent/90 transition-all"
+              >
+                Create Playbook
+              </button>
             </div>
           </div>
         </div>

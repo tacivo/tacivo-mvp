@@ -18,6 +18,9 @@ type SharedDocument = {
     full_name: string | null
     role: string | null
   }
+  interviews?: {
+    function_area: string | null
+  }
 }
 
 export default function ExperiencesPage() {
@@ -67,10 +70,12 @@ export default function ExperiencesPage() {
 
   const filteredDocs = sharedDocs.filter(doc => {
     const searchLower = searchQuery.toLowerCase()
+    const interview = (doc as any).interviews
     return (
       doc.title.toLowerCase().includes(searchLower) ||
       doc.profiles?.full_name?.toLowerCase().includes(searchLower) ||
-      doc.profiles?.role?.toLowerCase().includes(searchLower)
+      doc.profiles?.role?.toLowerCase().includes(searchLower) ||
+      interview?.function_area?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -130,17 +135,19 @@ export default function ExperiencesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
-              onClick={() => router.push(`/documents/${doc.id}`)}
+              onClick={() => router.push(`/platform/experiences/${doc.id}`)}
               className="bg-card rounded-lg border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
             >
-              {/* Document Icon and Type */}
+              {/* Document Icon and Function Area */}
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                   <FileText className="w-6 h-6 text-accent" />
                 </div>
-                <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground">
-                  {doc.document_type === 'case-study' ? 'Case Study' : 'Best Practices'}
-                </span>
+                {(doc as any).interviews?.function_area && (
+                  <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground capitalize">
+                    {(doc as any).interviews.function_area}
+                  </span>
+                )}
               </div>
 
               {/* Title */}
@@ -170,7 +177,7 @@ export default function ExperiencesPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    router.push(`/documents/${doc.id}`)
+                    router.push(`/platform/experiences/${doc.id}`)
                   }}
                   className="w-full px-4 py-2 bg-accent/10 text-accent rounded-lg font-medium hover:bg-accent/20 transition-colors flex items-center justify-center gap-2"
                 >

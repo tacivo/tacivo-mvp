@@ -8,6 +8,7 @@ import {
   InterviewMessage,
   Document
 } from '@/types/database.types'
+import { extractPlainTextFromBlockNoteString } from '@/lib/blocknote-utils'
 
 /**
  * Create a new interview
@@ -147,16 +148,29 @@ export async function getInterviewMessages(interviewId: string) {
 }
 
 /**
- * Create document
+ * Create document and extract plain text
  */
 export async function createDocument(data: InsertDocument) {
+  // Extract plain text if format is blocknote
+  let plainText = '';
+  if (data.format === 'blocknote' && data.content) {
+    plainText = extractPlainTextFromBlockNoteString(data.content);
+  }
+
+  // Include plain_text in the insert data
+  const insertData = {
+    ...data,
+    ...(plainText ? { plain_text: plainText } : {})
+  };
+
   const { data: document, error } = await supabase
     .from('documents')
-    .insert(data as any)
+    .insert(insertData as any)
     .select()
     .single()
 
   if (error) throw error
+
   return document as Document
 }
 
@@ -296,6 +310,9 @@ export async function getSharedCompanyDocuments() {
         full_name,
         role,
         company
+      ),
+      interviews:interview_id (
+        function_area
       )
     `)
     .eq('is_shared', true)
@@ -355,6 +372,62 @@ export async function getOrganizationExperts() {
 
   if (error) throw error
   return (data || []) as any[]
+}
+
+/**
+ * Get all documents accessible to the current user (shared company docs + user's own docs)
+ */
+export async function getAccessibleDocuments() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Get shared documents from company
+  const { data: sharedDocs, error: sharedError } = await supabase
+    .from('documents')
+    .select(`
+      *,
+      profiles:user_id (
+        id,
+        full_name,
+        role,
+        company
+      ),
+      interviews:interview_id (
+        function_area
+      )
+    `)
+    .eq('is_shared', true)
+    .order('created_at', { ascending: false })
+
+  if (sharedError) throw sharedError
+
+  // Get user's own documents (both shared and private)
+  const { data: ownDocs, error: ownError } = await supabase
+    .from('documents')
+    .select(`
+      *,
+      profiles:user_id (
+        id,
+        full_name,
+        role,
+        company
+      ),
+      interviews:interview_id (
+        function_area
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (ownError) throw ownError
+
+  // Combine and deduplicate (in case user's shared docs appear in both)
+  const allDocs = [...(sharedDocs || []), ...(ownDocs || [])]
+  const uniqueDocs = allDocs.filter((doc: any, index: number, self: any[]) =>
+    self.findIndex((d: any) => d.id === doc.id) === index
+  )
+
+  return uniqueDocs as any[]
 }
 
 /**
