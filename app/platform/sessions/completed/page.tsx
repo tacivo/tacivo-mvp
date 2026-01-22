@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, Eye, User, Globe, Lock } from 'lucide-react'
+import { CheckCircle, Eye, User, Globe, Lock, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
-import { getUserInterviews, getUserDocuments } from '@/lib/supabase/interviews'
+import { getUserInterviews, getUserDocuments, deleteDocumentWithRelated } from '@/lib/supabase/interviews'
 import { Interview, Document, Profile } from '@/types/database.types'
 
 export default function CompletedSessionsPage() {
@@ -60,6 +60,23 @@ export default function CompletedSessionsPage() {
 
   const handleViewDocument = (documentId: string) => {
     router.push(`/platform/sessions/completed/${documentId}`)
+  }
+
+  const handleDeleteDocument = async (documentId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (!confirm('Are you sure you want to delete this session? This will permanently delete the document, interview, and all messages.')) {
+      return
+    }
+
+    try {
+      await deleteDocumentWithRelated(documentId)
+      // Refresh the data after deletion
+      await loadData()
+    } catch (error) {
+      console.error('Error deleting document:', error)
+      alert('Failed to delete session. Please try again.')
+    }
   }
 
   if (isLoading) {
@@ -129,7 +146,7 @@ export default function CompletedSessionsPage() {
                     </div>
 
                     <h3 className="text-lg font-medium text-foreground mb-2 group-hover:text-accent">
-                      {interview.title || interview.description}
+                      {document?.title || interview.title || interview.description}
                     </h3>
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -151,6 +168,13 @@ export default function CompletedSessionsPage() {
                       >
                         <Eye className="w-4 h-4" />
                         View
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteDocument(document.id, e)}
+                        className="px-3 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-colors flex items-center gap-2 border border-red-200"
+                        title="Delete session"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   )}

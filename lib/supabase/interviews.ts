@@ -107,6 +107,25 @@ export async function updateInterviewStatus(
 }
 
 /**
+ * Update interview function area
+ */
+export async function updateInterviewFunctionArea(
+  interviewId: string,
+  functionArea: string
+) {
+  const { data, error } = await supabase
+    .from('interviews')
+    // @ts-ignore - Supabase type inference issue with update
+    .update({ function_area: functionArea })
+    .eq('id', interviewId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Interview
+}
+
+/**
  * Add message to interview
  */
 export async function addInterviewMessage(data: InsertInterviewMessage) {
@@ -235,6 +254,46 @@ export async function deleteInterview(interviewId: string) {
     .eq('id', interviewId)
 
   if (error) throw error
+}
+
+/**
+ * Delete document along with its related interview and messages
+ */
+export async function deleteDocumentWithRelated(documentId: string) {
+  // First get the document to find the interview_id
+  const { data: document, error: fetchError } = await supabase
+    .from('documents')
+    .select('interview_id')
+    .eq('id', documentId)
+    .single()
+
+  if (fetchError) throw fetchError
+
+  const interviewId = (document as { interview_id: string }).interview_id
+
+  // Delete interview messages first
+  const { error: messagesError } = await supabase
+    .from('interview_messages')
+    .delete()
+    .eq('interview_id', interviewId)
+
+  if (messagesError) throw messagesError
+
+  // Delete the document
+  const { error: documentError } = await supabase
+    .from('documents')
+    .delete()
+    .eq('id', documentId)
+
+  if (documentError) throw documentError
+
+  // Delete the interview
+  const { error: interviewError } = await supabase
+    .from('interviews')
+    .delete()
+    .eq('id', interviewId)
+
+  if (interviewError) throw interviewError
 }
 
 /**

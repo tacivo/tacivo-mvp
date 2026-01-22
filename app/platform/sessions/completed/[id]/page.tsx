@@ -7,7 +7,7 @@ import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand
 import ReactMarkdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
-import { shareDocument, unshareDocument } from '@/lib/supabase/interviews';
+import { shareDocument, unshareDocument, updateInterviewFunctionArea } from '@/lib/supabase/interviews';
 import { Document } from '@/types/database.types';
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
@@ -32,6 +32,7 @@ export default function DocumentViewPage() {
   const [blockNoteContent, setBlockNoteContent] = useState<any[]>([]);
   const [aiSuggestion, setAiSuggestion] = useState<{ original: string; suggestion: string; blockId: string } | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [editedFunctionArea, setEditedFunctionArea] = useState('');
 
   // AI helper function with suggestion workflow
   const callAI = async (operation: string, selectedText: string, blockId?: string, showSuggestion: boolean = false) => {
@@ -294,12 +295,15 @@ export default function DocumentViewPage() {
   const handleEditStart = () => {
     if (!document) return;
     setEditedTitle(document.title);
+    // Use document.function_area first, fallback to interview for backwards compatibility
+    setEditedFunctionArea(document.function_area || interview?.function_area || '');
     setIsEditing(true);
   };
 
   const handleEditCancel = () => {
     setIsEditing(false);
     setEditedTitle('');
+    setEditedFunctionArea('');
     // Reset editor content
     if (blockNoteContent.length > 0 && editor) {
       editor.replaceBlocks(editor.document, blockNoteContent);
@@ -324,18 +328,26 @@ export default function DocumentViewPage() {
           content: JSON.stringify(currentBlocks),
           format: 'blocknote',
           plain_text: plainText,
+          function_area: editedFunctionArea || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', document.id);
 
       if (error) throw error;
 
+      // Also update function_area on interview if it exists (for backwards compatibility)
+      if ((document as any).interview_id && editedFunctionArea !== interview?.function_area) {
+        await updateInterviewFunctionArea((document as any).interview_id, editedFunctionArea);
+        setInterview({ ...interview, function_area: editedFunctionArea });
+      }
+
       // Update local state
       setDocument({
         ...document,
         title: editedTitle,
         content: JSON.stringify(currentBlocks),
-        format: 'blocknote'
+        format: 'blocknote',
+        function_area: editedFunctionArea || null
       });
 
       setBlockNoteContent(currentBlocks);
@@ -514,11 +526,19 @@ export default function DocumentViewPage() {
               )}
 
               {/* Function Area */}
-              {interview?.function_area && (
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editedFunctionArea}
+                  onChange={(e) => setEditedFunctionArea(e.target.value)}
+                  placeholder="Function area (e.g. Sales, Engineering)"
+                  className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-300 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-48"
+                />
+              ) : (document.function_area || interview?.function_area) ? (
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-medium capitalize">
-                  {interview.function_area}
+                  {document.function_area || interview?.function_area}
                 </span>
-              )}
+              ) : null}
 
               {/* Date */}
               <span className="flex items-center gap-1.5 text-gray-500">

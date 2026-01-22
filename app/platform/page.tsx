@@ -297,8 +297,8 @@ export default function PlatformHomePage() {
                     ]
                     const colorIndex = ownerProfile?.full_name?.charCodeAt(0) % colors.length || 0
 
-                    // Get the interview to access function_area
-                    const interview = (doc as any).interviews
+                    // Get function_area from document first, fallback to interviews join for backwards compatibility
+                    const functionArea = doc.function_area || (doc as any).interviews?.function_area
 
                     return (
                       <div
@@ -316,9 +316,9 @@ export default function PlatformHomePage() {
                               <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                 Shared
                               </span>
-                              {interview?.function_area && (
+                              {functionArea && (
                                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-secondary text-foreground border border-border">
-                                  {interview.function_area}
+                                  {functionArea}
                                 </span>
                               )}
                             </div>

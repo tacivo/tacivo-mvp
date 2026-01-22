@@ -233,6 +233,7 @@ export interface Database {
           file_url: string | null
           is_shared: boolean
           plain_text: string | null
+          function_area: string | null
           created_at: string
           updated_at: string
         }
@@ -248,6 +249,7 @@ export interface Database {
           file_url?: string | null
           is_shared?: boolean
           plain_text?: string | null
+          function_area?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -263,6 +265,7 @@ export interface Database {
           file_url?: string | null
           is_shared?: boolean
           plain_text?: string | null
+          function_area?: string | null
           created_at?: string
           updated_at?: string
         }

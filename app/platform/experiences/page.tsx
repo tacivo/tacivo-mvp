@@ -14,6 +14,7 @@ type SharedDocument = {
   document_type: 'case-study' | 'best-practices'
   created_at: string
   user_id: string
+  function_area: string | null
   profiles?: {
     full_name: string | null
     role: string | null
@@ -70,12 +71,13 @@ export default function ExperiencesPage() {
 
   const filteredDocs = sharedDocs.filter(doc => {
     const searchLower = searchQuery.toLowerCase()
-    const interview = (doc as any).interviews
+    // Use function_area directly from document, fallback to interviews join for backwards compatibility
+    const functionArea = doc.function_area || (doc as any).interviews?.function_area
     return (
       doc.title.toLowerCase().includes(searchLower) ||
       doc.profiles?.full_name?.toLowerCase().includes(searchLower) ||
       doc.profiles?.role?.toLowerCase().includes(searchLower) ||
-      interview?.function_area?.toLowerCase().includes(searchLower)
+      functionArea?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -143,9 +145,9 @@ export default function ExperiencesPage() {
                 <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                   <FileText className="w-6 h-6 text-accent" />
                 </div>
-                {(doc as any).interviews?.function_area && (
+                {(doc.function_area || (doc as any).interviews?.function_area) && (
                   <span className="px-2 py-1 text-xs font-medium rounded bg-muted text-muted-foreground capitalize">
-                    {(doc as any).interviews.function_area}
+                    {doc.function_area || (doc as any).interviews?.function_area}
                   </span>
                 )}
               </div>

@@ -441,11 +441,13 @@ function ExperiencePageContent() {
       const doc = await createDocument({
         interview_id: currentInterviewId,
         user_id: userProfile.id,
+        organization_id: userProfile.organization_id,
         title: context.title || context.process || 'Case Study',
         content: format === 'blocknote' ? JSON.stringify(blockNoteBlocks) : documentContent,
         document_type: 'case-study',
         format: format || 'markdown',
-        is_shared: false
+        is_shared: false,
+        function_area: context.process || null
       })
 
       // Redirect to document viewing page
