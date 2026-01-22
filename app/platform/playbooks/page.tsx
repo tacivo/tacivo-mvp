@@ -207,31 +207,46 @@ export default function PlaybooksPage() {
 
         buffer += decoder.decode(value, { stream: true })
 
-        // Parse SSE events from buffer
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep incomplete line in buffer
+        // SSE events are separated by double newlines
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || '' // Keep incomplete event in buffer
 
-        let eventType = ''
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            eventType = line.slice(7)
-          } else if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6))
+        for (const event of events) {
+          if (!event.trim()) continue
 
-            if (eventType === 'status') {
-              setGenerationStatus(data.message)
-            } else if (eventType === 'error') {
-              throw new Error(data.error)
-            } else if (eventType === 'complete') {
-              console.log('Generated playbook:', data)
-              setGenerationStatus('Playbook created successfully!')
-              // Clear selections
-              setSelectedDocuments(new Set())
-              setPlaybookTitle('')
-              // Redirect to shared playbooks page to view the generated playbook
-              setTimeout(() => {
-                router.push('/platform/shared-playbooks')
-              }, 500)
+          const lines = event.split('\n')
+          let eventType = ''
+          let eventData = ''
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim()
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6)
+            }
+          }
+
+          if (eventType && eventData) {
+            try {
+              const data = JSON.parse(eventData)
+
+              if (eventType === 'status') {
+                setGenerationStatus(data.message)
+              } else if (eventType === 'error') {
+                throw new Error(data.error)
+              } else if (eventType === 'complete') {
+                console.log('Generated playbook:', data)
+                setGenerationStatus('Playbook created successfully!')
+                // Clear selections
+                setSelectedDocuments(new Set())
+                setPlaybookTitle('')
+                // Redirect to shared playbooks page to view the generated playbook
+                setTimeout(() => {
+                  router.push('/platform/shared-playbooks')
+                }, 500)
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse SSE event data:', eventData, parseError)
             }
           }
         }
