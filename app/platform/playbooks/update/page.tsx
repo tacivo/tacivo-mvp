@@ -54,6 +54,7 @@ export default function UpdatePlaybooksPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [additionalContext, setAdditionalContext] = useState('')
   const [dragActive, setDragActive] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState('')
 
   useEffect(() => {
     loadData()
@@ -241,6 +242,8 @@ export default function UpdatePlaybooksPage() {
     if (!selectedPlaybook && !uploadedPlaybook) return
 
     setIsUpdating(true)
+    setUpdateStatus('Preparing update...')
+
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -249,76 +252,107 @@ export default function UpdatePlaybooksPage() {
         return
       }
 
+      let requestBody: any
       if (uploadedPlaybook) {
-        // Handle uploaded file - create new playbook with selected experiences
-        const response = await fetch('/api/update-playbook', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uploadedContent: uploadedPlaybook.content,
-            uploadedTitle: uploadedPlaybook.title,
-            documentIds: Array.from(selectedDocuments),
-            newDocumentIds: Array.from(selectedDocuments), // All are new for uploaded files
-            additionalContext: additionalContext || undefined,
-            userId: user.id,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to update playbook')
-        }
-
-        const result = await response.json()
-
-        if (result.error) {
-          alert(`Update failed: ${result.error}`)
-        } else {
-          alert('Playbook created successfully from your uploaded file!')
-          // Redirect to the new playbook
-          router.push(`/platform/shared-playbooks/${result.playbookId}`)
+        requestBody = {
+          uploadedContent: uploadedPlaybook.content,
+          uploadedTitle: uploadedPlaybook.title,
+          documentIds: Array.from(selectedDocuments),
+          newDocumentIds: Array.from(selectedDocuments),
+          additionalContext: additionalContext || undefined,
+          userId: user.id,
         }
       } else if (selectedPlaybook) {
-        // Handle existing playbook update
         const existingDocIds = new Set(selectedPlaybook.document_ids || [])
         const newDocIds = Array.from(selectedDocuments).filter(id => !existingDocIds.has(id))
-
-        const response = await fetch('/api/update-playbook', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            playbookId: selectedPlaybook.id,
-            documentIds: Array.from(selectedDocuments),
-            newDocumentIds: newDocIds,
-            additionalContext: additionalContext || undefined,
-            userId: user.id,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to update playbook')
-        }
-
-        const result = await response.json()
-
-        if (result.error) {
-          alert(`Update failed: ${result.error}`)
-        } else {
-          alert('Playbook updated successfully!')
-          // Redirect to the updated playbook
-          router.push(`/platform/shared-playbooks/${selectedPlaybook.id}`)
+        requestBody = {
+          playbookId: selectedPlaybook.id,
+          documentIds: Array.from(selectedDocuments),
+          newDocumentIds: newDocIds,
+          additionalContext: additionalContext || undefined,
+          userId: user.id,
         }
       }
+
+      const response = await fetch('/api/update-playbook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update playbook')
+      }
+
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response stream')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // SSE events are separated by double newlines
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+
+        for (const event of events) {
+          if (!event.trim()) continue
+
+          const lines = event.split('\n')
+          let eventType = ''
+          let eventData = ''
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim()
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6)
+            }
+          }
+
+          if (eventType && eventData) {
+            try {
+              const data = JSON.parse(eventData)
+
+              if (eventType === 'status') {
+                setUpdateStatus(data.message)
+              } else if (eventType === 'error') {
+                throw new Error(data.error)
+              } else if (eventType === 'complete') {
+                console.log('Updated playbook:', data)
+                setUpdateStatus('Success!')
+                // Redirect to the playbook
+                setTimeout(() => {
+                  router.push(`/platform/shared-playbooks/${data.playbookId}`)
+                }, 500)
+              }
+            } catch (parseError) {
+              if (parseError instanceof Error && parseError.message !== 'Failed to update playbook') {
+                console.warn('Failed to parse SSE event data:', eventData, parseError)
+              } else {
+                throw parseError
+              }
+            }
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Error updating playbook:', error)
-      alert('Failed to update playbook. Please try again.')
+      alert(error instanceof Error ? error.message : 'Failed to update playbook. Please try again.')
     } finally {
       setIsUpdating(false)
+      setUpdateStatus('')
     }
   }
 
@@ -591,7 +625,21 @@ export default function UpdatePlaybooksPage() {
       </div>
 
       {/* Selection Summary */}
-      <div className="bg-card rounded-xl border border-border p-6 mb-8">
+      <div className={`bg-card rounded-xl border p-6 mb-8 transition-colors ${isUpdating ? 'border-accent/50 bg-accent/5' : 'border-border'}`}>
+        {/* Update Progress Banner */}
+        {isUpdating && updateStatus && (
+          <div className="mb-6 p-4 bg-accent/10 rounded-lg border border-accent/20">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-accent animate-spin flex-shrink-0" />
+              <div className="overflow-hidden">
+                <p className="font-medium text-foreground">
+                  {uploadedPlaybook ? 'Creating your playbook...' : 'Updating your playbook...'}
+                </p>
+                <p className="text-sm text-muted-foreground">{updateStatus}</p>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-foreground mb-2">Selected Experiences</h3>
@@ -601,7 +649,7 @@ export default function UpdatePlaybooksPage() {
                 : `${selectedDocuments.size} experiences selected (${newDocCount > 0 ? newDocCount : 0} new)`
               }
             </p>
-            {selectedDocuments.size > 0 && (
+            {selectedDocuments.size > 0 && !isUpdating && (
               <div className="flex items-center gap-2 text-green-600 text-sm">
                 <CheckCircle className="w-4 h-4" />
                 Ready to update
