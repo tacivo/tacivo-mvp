@@ -264,6 +264,85 @@ Return ONLY the complete updated playbook content (not the title, just the conte
 
         console.log(`Successfully updated playbook. New length: ${updatedContent.length} characters`);
 
+        sendEvent('status', { message: 'Converting to editor format...' });
+
+        // Convert markdown to BlockNote format
+        const convertMarkdownToBlockNote = (markdown: string) => {
+          const lines = markdown.split('\n');
+          const blocks = [];
+          let blockId = 0;
+
+          for (const line of lines) {
+            if (!line.trim()) {
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'paragraph',
+                content: []
+              });
+            } else if (line.startsWith('# ')) {
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'heading',
+                props: { level: 1 },
+                content: [{ type: 'text', text: line.substring(2), styles: {} }]
+              });
+            } else if (line.startsWith('## ')) {
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'heading',
+                props: { level: 2 },
+                content: [{ type: 'text', text: line.substring(3), styles: {} }]
+              });
+            } else if (line.startsWith('### ')) {
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'heading',
+                props: { level: 3 },
+                content: [{ type: 'text', text: line.substring(4), styles: {} }]
+              });
+            } else if (line.startsWith('- ') || line.startsWith('* ')) {
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'bulletListItem',
+                content: [{ type: 'text', text: line.substring(2), styles: {} }]
+              });
+            } else if (line.match(/^\d+\.\s/)) {
+              const text = line.replace(/^\d+\.\s/, '');
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'numberedListItem',
+                content: [{ type: 'text', text, styles: {} }]
+              });
+            } else {
+              const parts: Array<{ type: string; text: string; styles: Record<string, boolean> }> = [];
+              const boldItalicRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|[^*]+)/g;
+              const matches = line.match(boldItalicRegex);
+
+              if (matches) {
+                matches.forEach(match => {
+                  if (match.startsWith('**') && match.endsWith('**')) {
+                    parts.push({ type: 'text', text: match.slice(2, -2), styles: { bold: true } });
+                  } else if (match.startsWith('*') && match.endsWith('*')) {
+                    parts.push({ type: 'text', text: match.slice(1, -1), styles: { italic: true } });
+                  } else if (match) {
+                    parts.push({ type: 'text', text: match, styles: {} });
+                  }
+                });
+              }
+
+              blocks.push({
+                id: `block-${blockId++}`,
+                type: 'paragraph',
+                content: parts.length > 0 ? parts : [{ type: 'text', text: line, styles: {} }]
+              });
+            }
+          }
+
+          return blocks;
+        };
+
+        const blockNoteContent = convertMarkdownToBlockNote(updatedContent);
+
         sendEvent('status', { message: 'Saving playbook...' });
 
         if (isUploadedFile) {
@@ -273,7 +352,7 @@ Return ONLY the complete updated playbook content (not the title, just the conte
             .insert({
               title: playbookData.title,
               type: playbookData.type,
-              content: updatedContent,
+              content: JSON.stringify(blockNoteContent),
               document_ids: documentIds,
               user_id: userId,
               is_shared: false,
@@ -301,7 +380,7 @@ Return ONLY the complete updated playbook content (not the title, just the conte
           const { error: updateError } = await (supabase as any)
             .from('playbooks')
             .update({
-              content: updatedContent,
+              content: JSON.stringify(blockNoteContent),
               document_ids: documentIds,
               updated_at: new Date().toISOString()
             })
