@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase, Globe, Lock, FileText, Library } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase, Globe, Lock, FileText, Library, List, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
 import { Playbook, Document } from '@/types/database.types';
@@ -26,7 +26,6 @@ export default function PlaybookDetailPage() {
 
   const [playbook, setPlaybook] = useState<PlaybookWithSources | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
@@ -35,6 +34,9 @@ export default function PlaybookDetailPage() {
   const [aiSuggestion, setAiSuggestion] = useState<{ original: string; suggestion: string; blockId: string } | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [showSources, setShowSources] = useState(true);
+  const [tableOfContents, setTableOfContents] = useState<{ id: string; text: string; level: number }[]>([]);
+  const [copiedSidebar, setCopiedSidebar] = useState(false);
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
   // AI helper function with suggestion workflow
   const callAI = async (operation: string, selectedText: string, blockId?: string, showSuggestion: boolean = false) => {
@@ -106,6 +108,115 @@ export default function PlaybookDetailPage() {
     }
   }, [blockNoteContent, editor]);
 
+  // Extract table of contents from headings (only H1 and H2)
+  useEffect(() => {
+    if (blockNoteContent.length > 0) {
+      const headings = blockNoteContent
+        .filter((block: any) => block.type === 'heading')
+        .map((block: any) => ({
+          id: block.id,
+          text: block.content?.map((c: any) => c.text || '').join('') || '',
+          level: block.props?.level || 1
+        }))
+        .filter((h: any) => h.text.trim() !== '' && h.level <= 2); // Only H1 and H2
+      setTableOfContents(headings);
+    }
+  }, [blockNoteContent]);
+
+  // Track active heading on scroll using Intersection Observer
+  useEffect(() => {
+    if (tableOfContents.length === 0) return;
+
+    // Wait for BlockNote to render
+    const setupObserver = () => {
+      const editorContainer = document.querySelector('.bn-editor');
+      if (!editorContainer) return null;
+
+      // Get all h1, h2, h3 elements within the editor
+      const allHeadings = Array.from(editorContainer.querySelectorAll('h1, h2, h3'));
+      if (allHeadings.length === 0) return null;
+
+      // Map DOM headings to TOC entries
+      const headingToTocMap = new Map<Element, number>();
+      allHeadings.forEach((heading) => {
+        const text = heading.textContent?.trim() || '';
+        const tocIndex = tableOfContents.findIndex(h => h.text.trim() === text);
+        if (tocIndex !== -1) {
+          headingToTocMap.set(heading, tocIndex);
+        }
+      });
+
+      if (headingToTocMap.size === 0) return null;
+
+      // Track which headings are currently visible
+      const visibleHeadings = new Set<number>();
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const tocIndex = headingToTocMap.get(entry.target);
+            if (tocIndex === undefined) return;
+
+            if (entry.isIntersecting) {
+              visibleHeadings.add(tocIndex);
+            } else {
+              visibleHeadings.delete(tocIndex);
+            }
+          });
+
+          // Set active to the first visible heading, or the last one that passed
+          if (visibleHeadings.size > 0) {
+            const firstVisible = Math.min(...Array.from(visibleHeadings));
+            setActiveHeadingId(tableOfContents[firstVisible]?.id || null);
+          } else {
+            // Find the heading closest to top that has passed
+            let lastPassed: number | null = null;
+            allHeadings.forEach((heading) => {
+              const tocIndex = headingToTocMap.get(heading);
+              if (tocIndex === undefined) return;
+              const rect = heading.getBoundingClientRect();
+              if (rect.top < 150) {
+                lastPassed = tocIndex;
+              }
+            });
+            if (lastPassed !== null) {
+              setActiveHeadingId(tableOfContents[lastPassed]?.id || null);
+            }
+          }
+        },
+        {
+          rootMargin: '-140px 0px -70% 0px', // Top offset for header + title section, bottom to trigger early
+          threshold: 0
+        }
+      );
+
+      // Observe all mapped headings
+      headingToTocMap.forEach((_, heading) => {
+        observer.observe(heading);
+      });
+
+      return observer;
+    };
+
+    // Set initial active heading
+    if (tableOfContents.length > 0) {
+      setActiveHeadingId(tableOfContents[0].id);
+    }
+
+    // Delay setup to let BlockNote render
+    const timeoutId = setTimeout(() => {
+      const observer = setupObserver();
+      if (!observer) {
+        // Retry if BlockNote hasn't rendered yet
+        setTimeout(() => setupObserver(), 500);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [tableOfContents]);
+
   async function loadPlaybook() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -169,19 +280,6 @@ export default function PlaybookDetailPage() {
     }
   }
 
-  const copyToClipboard = async () => {
-    if (!playbook || !editor) return;
-
-    try {
-      const markdown = await editor.blocksToMarkdownLossy(editor.document);
-      await navigator.clipboard.writeText(markdown);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
-    }
-  };
-
   const downloadPDF = async () => {
     if (!playbook || !editor) return;
 
@@ -236,6 +334,69 @@ export default function PlaybookDetailPage() {
     a.download = `${playbook.title}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const copyToClipboardSidebar = async () => {
+    if (!playbook || !editor) return;
+
+    try {
+      const markdown = await editor.blocksToMarkdownLossy(editor.document);
+      const fullContent = `# ${playbook.title}\n\n${markdown}`;
+      await navigator.clipboard.writeText(fullContent);
+      setCopiedSidebar(true);
+      setTimeout(() => setCopiedSidebar(false), 2000);
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+    }
+  };
+
+  const openInClaude = async () => {
+    if (!playbook || !editor) return;
+
+    try {
+      const markdown = await editor.blocksToMarkdownLossy(editor.document);
+      const fullContent = `# ${playbook.title}\n\n${markdown}`;
+
+      // Copy just the document content to clipboard
+      await navigator.clipboard.writeText(fullContent);
+
+      // Use a short prompt in URL that tells user to paste
+      const shortPrompt = encodeURIComponent(`I have a playbook document titled "${playbook.title}" copied to my clipboard. I'll paste it now so you can use it to answer my questions about my current situation.`);
+      window.open(`https://claude.ai/new?q=${shortPrompt}`, '_blank');
+    } catch (error) {
+      console.error('Error opening in Claude:', error);
+    }
+  };
+
+  const openInChatGPT = async () => {
+    if (!playbook || !editor) return;
+
+    try {
+      const markdown = await editor.blocksToMarkdownLossy(editor.document);
+      const fullContent = `# ${playbook.title}\n\n${markdown}`;
+
+      // Copy just the document content to clipboard
+      await navigator.clipboard.writeText(fullContent);
+
+      // Use a short prompt in URL that tells user to paste
+      const shortPrompt = encodeURIComponent(`I have a playbook document titled "${playbook.title}" copied to my clipboard. I'll paste it now so you can use it to answer my questions about my current situation.`);
+      window.open(`https://chatgpt.com/?prompt=${shortPrompt}`, '_blank');
+    } catch (error) {
+      console.error('Error opening in ChatGPT:', error);
+    }
+  };
+
+  const scrollToHeading = (headingId: string) => {
+    // Set active immediately on click
+    setActiveHeadingId(headingId);
+
+    // Find the heading element in the BlockNote editor
+    const headingElement = document.querySelector(`[data-id="${headingId}"]`) ||
+                          document.querySelector(`[data-block-id="${headingId}"]`) ||
+                          document.getElementById(headingId);
+    if (headingElement) {
+      headingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handleShareToggle = async () => {
@@ -406,22 +567,6 @@ export default function PlaybookDetailPage() {
               {!isEditing && (
                 <>
                   <button
-                    onClick={copyToClipboard}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors flex items-center gap-1.5"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4 text-green-600" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                  <button
                     onClick={downloadMarkdown}
                     className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors flex items-center gap-1.5"
                   >
@@ -442,29 +587,28 @@ export default function PlaybookDetailPage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-8 lg:px-16 py-16">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          {/* Title */}
-          <div className="mb-4">
+      {/* Title Section - Sticky below header */}
+      <div className="sticky top-14 z-40 bg-[#FAFAFA] border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-8 lg:px-16 py-4">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
             {isEditing ? (
               <input
                 type="text"
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
-                className="w-full text-[2.5rem] leading-[1.2] font-bold text-gray-900 mb-3 px-2 py-1 -ml-2 border-none focus:outline-none focus:bg-gray-50 rounded placeholder:text-gray-400"
+                className="w-full text-2xl font-bold text-gray-900 mb-2 px-2 py-1 -ml-2 border-none focus:outline-none focus:bg-gray-50 rounded placeholder:text-gray-400"
                 placeholder="Untitled Playbook"
               />
             ) : (
-              <h1 className="text-[2.5rem] leading-[1.2] font-bold text-gray-900 mb-3 px-2 -ml-2">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 {playbook.title}
               </h1>
             )}
-            <div className="flex items-center gap-4 px-2 text-sm text-gray-500">
+            <div className="flex items-center flex-wrap gap-3 text-sm text-gray-500">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
                 {getTypeLabel(playbook.type)}
               </span>
@@ -493,16 +637,26 @@ export default function PlaybookDetailPage() {
               {playbook.is_shared && (
                 <span className="flex items-center gap-1.5 text-green-600">
                   <Globe className="w-4 h-4" />
-                  Shared with organization
+                  Shared
                 </span>
               )}
               {playbook.profiles?.full_name && (
                 <span className="flex items-center gap-1.5">
-                  Created by {playbook.profiles.full_name}
+                  By {playbook.profiles.full_name}
                 </span>
               )}
             </div>
-          </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-8 lg:px-16 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
 
           {/* Source Documents */}
           {playbook.sourceDocuments && playbook.sourceDocuments.length > 0 && (
@@ -713,16 +867,97 @@ export default function PlaybookDetailPage() {
             </div>
           )}
 
-          {/* Content - BlockNote Editor */}
-          <div className="mt-8">
-            <BlockNoteView
-              editor={editor}
-              editable={isEditing}
-              theme="light"
-            />
+          {/* Content - BlockNote Editor with Sidebar */}
+          <div className="mt-8 flex gap-8">
+            <div className="flex-1 min-w-0">
+              <BlockNoteView
+                editor={editor}
+                editable={isEditing}
+                theme="light"
+              />
+            </div>
+
+            {/* Right Sidebar */}
+            {!isEditing && (
+              <aside className="hidden lg:block w-64 flex-shrink-0">
+                <div className="sticky top-36">
+              {/* Action Buttons */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+                <button
+                  onClick={copyToClipboardSidebar}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  {copiedSidebar ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-green-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy page as markdown</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={openInClaude}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors group"
+                  title="Copies content and opens Claude - just paste!"
+                >
+                  <span className="w-4 h-4 flex items-center justify-center font-bold text-orange-600">A\</span>
+                  <span className="flex-1 text-left">Open in Claude</span>
+                  <ExternalLink className="w-3 h-3 text-gray-400" />
+                </button>
+                <button
+                  onClick={openInChatGPT}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors group"
+                  title="Copies content and opens ChatGPT - just paste!"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08-4.778 2.758a.795.795 0 0 0-.392.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
+                  </svg>
+                  <span className="flex-1 text-left">Open in ChatGPT</span>
+                  <ExternalLink className="w-3 h-3 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Table of Contents */}
+              {tableOfContents.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3 text-sm font-medium text-gray-900">
+                    <List className="w-4 h-4" />
+                    <span>Page contents</span>
+                  </div>
+                  <nav className="space-y-1">
+                    {tableOfContents.map((heading, index) => {
+                      const isActive = activeHeadingId === heading.id;
+                      return (
+                        <button
+                          key={heading.id || index}
+                          onClick={() => scrollToHeading(heading.id)}
+                          className={`w-full text-left text-sm transition-colors truncate ${
+                            isActive
+                              ? 'text-book-cloth font-medium'
+                              : 'text-gray-600 hover:text-gray-900'
+                          } ${heading.level === 1 && !isActive ? 'font-medium' : ''}`}
+                          style={{ paddingLeft: `${(heading.level - 1) * 12}px` }}
+                        >
+                          <span className={`inline-block w-1 h-4 mr-2 align-middle rounded-full ${
+                            isActive ? 'bg-book-cloth' : 'bg-gray-300'
+                          }`}></span>
+                          {heading.text}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+              )}
+              </div>
+            </aside>
+          )}
           </div>
         </motion.div>
-      </main>
+      </div>
     </div>
   );
 }
