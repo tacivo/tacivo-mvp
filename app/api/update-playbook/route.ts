@@ -170,6 +170,45 @@ ${doc.plain_text}
 
         sendEvent('status', { message: 'Analyzing content...' });
 
+        // Convert BlockNote JSON to readable markdown for the prompt
+        const convertBlockNoteToMarkdown = (content: string): string => {
+          try {
+            const blocks = JSON.parse(content);
+            if (!Array.isArray(blocks)) return content;
+
+            return blocks.map((block: any) => {
+              const getText = (contentArray: any[]): string => {
+                if (!contentArray || !Array.isArray(contentArray)) return '';
+                return contentArray.map((c: any) => {
+                  if (typeof c === 'string') return c;
+                  if (c.text) return c.text;
+                  return '';
+                }).join('');
+              };
+
+              const text = getText(block.content);
+
+              switch (block.type) {
+                case 'heading':
+                  const level = block.props?.level || 1;
+                  return '#'.repeat(level) + ' ' + text;
+                case 'bulletListItem':
+                  return '- ' + text;
+                case 'numberedListItem':
+                  return '1. ' + text;
+                case 'paragraph':
+                default:
+                  return text;
+              }
+            }).join('\n');
+          } catch {
+            // If not valid JSON, return as-is (already markdown)
+            return content;
+          }
+        };
+
+        const existingPlaybookContent = convertBlockNoteToMarkdown(playbookData.content);
+
         // Create update prompt
         let prompt = `You are updating an existing playbook by incorporating new information.
 
@@ -178,7 +217,7 @@ Title: ${playbookData.title}
 Type: ${playbookData.type}
 
 Content:
-${playbookData.content}
+${existingPlaybookContent}
 
 === YOUR TASK ===
 
