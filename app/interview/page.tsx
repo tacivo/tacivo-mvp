@@ -145,6 +145,7 @@ function ExperiencePageContent() {
     uploadedFiles: [],
   })
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
+  const [organization, setOrganization] = useState<{ name: string; industry: string | null; description: string | null } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -240,7 +241,21 @@ function ExperiencePageContent() {
       .single()
 
     if (profile) {
-      setUserProfile(profile as unknown as Profile)
+      const typedProfile = profile as unknown as Profile
+      setUserProfile(typedProfile)
+
+      // Fetch organization data if user belongs to one
+      if (typedProfile.organization_id) {
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('name, industry, description')
+          .eq('id', typedProfile.organization_id)
+          .single()
+
+        if (org) {
+          setOrganization(org)
+        }
+      }
     }
   }
 
@@ -425,7 +440,12 @@ function ExperiencePageContent() {
             expertName: userProfile.full_name || 'Expert',
             role: userProfile.role || 'Professional',
             yearsOfExperience: userProfile.years_of_experience || 0,
-            processToDocument: context.description || context.title
+            processToDocument: context.description || context.title,
+            functionArea: context.process || '',
+            areaOfExpertise: userProfile.area_of_expertise || '',
+            companyName: organization?.name || userProfile.company || '',
+            industry: organization?.industry || '',
+            companyDescription: organization?.description || '',
           }
         })
       })
@@ -522,6 +542,11 @@ function ExperiencePageContent() {
             role: userProfile.role || '',
             yearsOfExperience: userProfile.years_of_experience?.toString() || '0',
             processToDocument,
+            functionArea: context.process || '',
+            areaOfExpertise: userProfile.area_of_expertise || '',
+            companyName: organization?.name || userProfile.company || '',
+            industry: organization?.industry || '',
+            companyDescription: organization?.description || '',
           },
         }),
       })
@@ -629,6 +654,11 @@ function ExperiencePageContent() {
             role: userProfile?.role || '',
             yearsOfExperience: userProfile?.years_of_experience?.toString() || '0',
             processToDocument,
+            functionArea: context.process || '',
+            areaOfExpertise: userProfile?.area_of_expertise || '',
+            companyName: organization?.name || userProfile?.company || '',
+            industry: organization?.industry || '',
+            companyDescription: organization?.description || '',
           },
         }),
       })
