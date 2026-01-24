@@ -7,15 +7,15 @@ import Link from 'next/link'
 import {
   HomeIcon,
   RocketLaunchIcon,
-  SparklesIcon,
   ClockIcon,
   CheckCircleIcon,
   LightBulbIcon,
   BookOpenIcon,
   UserGroupIcon,
-  MagnifyingGlassIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
   UserIcon,
   ShieldCheckIcon,
   PlusIcon,
@@ -34,10 +34,25 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
   const [companyName, setCompanyName] = useState('Tacivo')
   const [companyLogo, setCompanyLogo] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [privateExpanded, setPrivateExpanded] = useState(true)
   const [collectiveExpanded, setCollectiveExpanded] = useState(true)
   const [settingsExpanded, setSettingsExpanded] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  // Load sidebar state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebarCollapsed')
+    if (savedState !== null) {
+      setSidebarCollapsed(savedState === 'true')
+    }
+  }, [])
+
+  // Save sidebar state to localStorage
+  const toggleSidebar = () => {
+    const newState = !sidebarCollapsed
+    setSidebarCollapsed(newState)
+    localStorage.setItem('sidebarCollapsed', String(newState))
+  }
 
   useEffect(() => {
     async function checkAuth() {
@@ -79,7 +94,6 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
   const navigationItems = [
     { icon: HomeIcon, label: 'Home', href: '/platform' },
     { icon: RocketLaunchIcon, label: 'Get Started', href: '/platform/get-started' },
-    { icon: SparklesIcon, label: 'Tacivo AI', href: '/platform/ai' },
   ]
 
   const privateItems = [
@@ -118,7 +132,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
   return (
     <div className="flex h-screen bg-background">
       {/* Left Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col overflow-y-auto">
+      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card border-r border-border flex flex-col overflow-y-auto transition-all duration-300 ease-in-out`}>
         {/* Company Name & Logo */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
@@ -135,21 +149,9 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
                 </span>
               </div>
             )}
-            <h1 className="text-lg font-semibold text-foreground truncate">{companyName}</h1>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="p-3">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/20"
-            />
+            {!sidebarCollapsed && (
+              <h1 className="text-lg font-semibold text-foreground truncate">{companyName}</h1>
+            )}
           </div>
         </div>
 
@@ -159,44 +161,48 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              title={sidebarCollapsed ? item.label : undefined}
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive(item.href)
                   ? 'bg-accent text-accent-foreground shadow-sm'
                   : 'text-foreground hover:bg-secondary'
               }`}
             >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!sidebarCollapsed && <span>{item.label}</span>}
             </Link>
           ))}
 
           {/* Private Section */}
           <div className="pt-4">
-            <button
-              onClick={() => setPrivateExpanded(!privateExpanded)}
-              className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-            >
-              {privateExpanded ? (
-                <ChevronDownIcon className="w-3 h-3" />
-              ) : (
-                <ChevronRightIcon className="w-3 h-3" />
-              )}
-              Private Database
-            </button>
-            {privateExpanded && (
-              <div className="mt-1 space-y-1">
+            {!sidebarCollapsed && (
+              <button
+                onClick={() => setPrivateExpanded(!privateExpanded)}
+                className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+              >
+                {privateExpanded ? (
+                  <ChevronDownIcon className="w-3 h-3" />
+                ) : (
+                  <ChevronRightIcon className="w-3 h-3" />
+                )}
+                Private Database
+              </button>
+            )}
+            {(sidebarCollapsed || privateExpanded) && (
+              <div className={`${sidebarCollapsed ? '' : 'mt-1'} space-y-1`}>
                 {privateItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    title={sidebarCollapsed ? item.label : undefined}
+                    className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive(item.href)
                         ? 'bg-accent text-accent-foreground shadow-sm'
                         : 'text-foreground hover:bg-secondary'
                     }`}
                   >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    {!sidebarCollapsed && <span>{item.label}</span>}
                   </Link>
                 ))}
               </div>
@@ -205,31 +211,34 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
 
           {/* Collective Section */}
           <div className="pt-4">
-            <button
-              onClick={() => setCollectiveExpanded(!collectiveExpanded)}
-              className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-            >
-              {collectiveExpanded ? (
-                <ChevronDownIcon className="w-3 h-3" />
-              ) : (
-                <ChevronRightIcon className="w-3 h-3" />
-              )}
-Shared
-            </button>
-            {collectiveExpanded && (
-              <div className="mt-1 space-y-1">
+            {!sidebarCollapsed && (
+              <button
+                onClick={() => setCollectiveExpanded(!collectiveExpanded)}
+                className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+              >
+                {collectiveExpanded ? (
+                  <ChevronDownIcon className="w-3 h-3" />
+                ) : (
+                  <ChevronRightIcon className="w-3 h-3" />
+                )}
+                Shared
+              </button>
+            )}
+            {(sidebarCollapsed || collectiveExpanded) && (
+              <div className={`${sidebarCollapsed ? '' : 'mt-1'} space-y-1`}>
                 {collectiveItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    title={sidebarCollapsed ? item.label : undefined}
+                    className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive(item.href)
                         ? 'bg-accent text-accent-foreground shadow-sm'
                         : 'text-foreground hover:bg-secondary'
                     }`}
                   >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    {!sidebarCollapsed && <span>{item.label}</span>}
                   </Link>
                 ))}
               </div>
@@ -238,47 +247,69 @@ Shared
 
           {/* Settings Section */}
           <div className="pt-4">
-            <button
-              onClick={() => setSettingsExpanded(!settingsExpanded)}
-              className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-            >
-              {settingsExpanded ? (
-                <ChevronDownIcon className="w-3 h-3" />
-              ) : (
-                <ChevronRightIcon className="w-3 h-3" />
-              )}
-              Settings
-            </button>
-            {settingsExpanded && (
-              <div className="mt-1 space-y-1">
+            {!sidebarCollapsed && (
+              <button
+                onClick={() => setSettingsExpanded(!settingsExpanded)}
+                className="flex items-center gap-2 px-3 py-1.5 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+              >
+                {settingsExpanded ? (
+                  <ChevronDownIcon className="w-3 h-3" />
+                ) : (
+                  <ChevronRightIcon className="w-3 h-3" />
+                )}
+                Settings
+              </button>
+            )}
+            {(sidebarCollapsed || settingsExpanded) && (
+              <div className={`${sidebarCollapsed ? '' : 'mt-1'} space-y-1`}>
                 <Link
                   href="/platform/profile"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  title={sidebarCollapsed ? 'Profile' : undefined}
+                  className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive('/platform/profile')
                       ? 'bg-accent text-accent-foreground shadow-sm'
                       : 'text-foreground hover:bg-secondary'
                   }`}
                 >
-                  <UserIcon className="w-5 h-5" />
-                  <span>Profile</span>
+                  <UserIcon className="w-5 h-5 flex-shrink-0" />
+                  {!sidebarCollapsed && <span>Profile</span>}
                 </Link>
                 {isAdmin && (
                   <Link
                     href="/platform/admin"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    title={sidebarCollapsed ? 'Admin' : undefined}
+                    className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive('/platform/admin')
                         ? 'bg-accent text-accent-foreground shadow-sm'
                         : 'text-foreground hover:bg-secondary'
                     }`}
                   >
-                    <ShieldCheckIcon className="w-5 h-5" />
-                    <span>Admin</span>
+                    <ShieldCheckIcon className="w-5 h-5 flex-shrink-0" />
+                    {!sidebarCollapsed && <span>Admin</span>}
                   </Link>
                 )}
               </div>
             )}
           </div>
         </nav>
+
+        {/* Sidebar Toggle Button */}
+        <div className="p-3 border-t border-border">
+          <button
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} w-full px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors`}
+          >
+            {sidebarCollapsed ? (
+              <ChevronDoubleRightIcon className="w-5 h-5" />
+            ) : (
+              <>
+                <ChevronDoubleLeftIcon className="w-5 h-5" />
+                <span>Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Area */}

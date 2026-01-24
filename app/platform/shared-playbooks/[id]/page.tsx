@@ -3,13 +3,53 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Copy, Check, Share2, Edit, Save, X, Sparkles, Wand2, CheckCircle, Maximize, Minimize, Briefcase, Globe, Lock, FileText, Library, List, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Check, Edit, Save, X, Globe, Lock, FileText, List, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase/client';
 import { Playbook, Document } from '@/types/database.types';
 import { BlockNoteView } from "@blocknote/mantine";
-import { useCreateBlockNote } from "@blocknote/react";
+import { useCreateBlockNote, FormattingToolbarController, FormattingToolbar, getFormattingToolbarItems, SuggestionMenuController, getDefaultReactSlashMenuItems } from "@blocknote/react";
+import { BlockNoteEditor } from "@blocknote/core";
+import { filterSuggestionItems } from "@blocknote/core/extensions";
+import { en as blockNoteEn } from "@blocknote/core/locales";
+import { AIExtension, AIMenuController, AIToolbarButton, getAISlashMenuItems } from "@blocknote/xl-ai";
+import { en as aiEn } from "@blocknote/xl-ai/locales";
+import { aiDocumentFormats } from "@blocknote/xl-ai/server";
+import { DefaultChatTransport } from "ai";
 import "@blocknote/mantine/style.css";
+import "@blocknote/xl-ai/style.css";
+
+// Custom formatting toolbar with AI button
+function FormattingToolbarWithAI() {
+  return (
+    <FormattingToolbarController
+      formattingToolbar={() => (
+        <FormattingToolbar>
+          {...getFormattingToolbarItems()}
+          <AIToolbarButton />
+        </FormattingToolbar>
+      )}
+    />
+  );
+}
+
+// Custom suggestion menu with AI slash commands
+function SuggestionMenuWithAI({ editor }: { editor: BlockNoteEditor<any, any, any> }) {
+  return (
+    <SuggestionMenuController
+      triggerCharacter="/"
+      getItems={async (query) =>
+        filterSuggestionItems(
+          [
+            ...getDefaultReactSlashMenuItems(editor),
+            ...getAISlashMenuItems(editor),
+          ],
+          query
+        )
+      }
+    />
+  );
+}
 
 type PlaybookWithSources = Playbook & {
   profiles?: {
@@ -31,71 +71,28 @@ export default function PlaybookDetailPage() {
   const [editedTitle, setEditedTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [blockNoteContent, setBlockNoteContent] = useState<any[]>([]);
-  const [aiSuggestion, setAiSuggestion] = useState<{ original: string; suggestion: string; blockId: string } | null>(null);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [showSources, setShowSources] = useState(true);
   const [tableOfContents, setTableOfContents] = useState<{ id: string; text: string; level: number }[]>([]);
   const [copiedSidebar, setCopiedSidebar] = useState(false);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
-  // AI helper function with suggestion workflow
-  const callAI = async (operation: string, selectedText: string, blockId?: string, showSuggestion: boolean = false) => {
-    try {
-      setIsLoadingAI(true);
-      const response = await fetch('/api/blocknote-ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          operation,
-          selectedText,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        const errorMsg = errorData.details || errorData.error || 'AI request failed';
-        throw new Error(`${errorMsg} (${errorData.errorName || 'Unknown'})`);
-      }
-
-      const data = await response.json();
-
-      if (showSuggestion && blockId) {
-        setAiSuggestion({
-          original: selectedText,
-          suggestion: data.text,
-          blockId
-        });
-        return null;
-      }
-
-      return data.text;
-    } catch (error: any) {
-      alert(`AI Error: ${error.message || 'Failed to process AI request'}`);
-      throw error;
-    } finally {
-      setIsLoadingAI(false);
-    }
-  };
-
-  const acceptSuggestion = () => {
-    if (!aiSuggestion) return;
-
-    const block = editor.document.find(b => b.id === aiSuggestion.blockId);
-    if (block) {
-      editor.updateBlock(block, { type: "paragraph", content: aiSuggestion.suggestion });
-    }
-    setAiSuggestion(null);
-  };
-
-  const rejectSuggestion = () => {
-    setAiSuggestion(null);
-  };
-
-  // Create BlockNote editor
+  // Create BlockNote editor with AI extension
   const editor = useCreateBlockNote({
     initialContent: blockNoteContent.length > 0 ? blockNoteContent : undefined,
+    dictionary: {
+      ...blockNoteEn,
+      ai: aiEn,
+    },
+    extensions: [
+      AIExtension({
+        transport: new DefaultChatTransport({
+          api: "/api/blocknote-ai-stream",
+        }),
+        streamToolsProvider: aiDocumentFormats.html.getStreamToolsProvider({
+          withDelays: true,
+        }),
+      }),
+    ],
   });
 
   useEffect(() => {
@@ -700,173 +697,6 @@ export default function PlaybookDetailPage() {
             </div>
           )}
 
-          {/* AI Toolbar - Only show in edit mode */}
-          {isEditing && (
-            <div className="mb-4 space-y-3">
-              <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 mb-1">
-                      AI-Powered Editing
-                    </p>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Select text in the editor, then use the AI tools below to enhance your writing.
-                    </p>
-
-                    {/* AI Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={async () => {
-                          const selection = editor.getSelection();
-                          if (!selection || !selection.blocks || selection.blocks.length === 0) {
-                            alert('Please select some text first');
-                            return;
-                          }
-                          const selectedText = selection.blocks.map((block: any) => block.content?.map((c: any) => c.text).join('')).join('\n');
-                          if (!selectedText) return;
-                          await callAI('improve', selectedText, selection.blocks[0].id, true);
-                        }}
-                        className="px-3 py-1.5 bg-white border border-purple-200 rounded-md text-xs font-medium text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-1.5"
-                      >
-                        <Wand2 className="w-3.5 h-3.5" />
-                        Improve
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const selection = editor.getSelection();
-                          if (!selection || !selection.blocks || selection.blocks.length === 0) {
-                            alert('Please select some text first');
-                            return;
-                          }
-                          const selectedText = selection.blocks.map((block: any) => block.content?.map((c: any) => c.text).join('')).join('\n');
-                          if (!selectedText) return;
-                          await callAI('fix', selectedText, selection.blocks[0].id, true);
-                        }}
-                        className="px-3 py-1.5 bg-white border border-purple-200 rounded-md text-xs font-medium text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-1.5"
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Fix Grammar
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const selection = editor.getSelection();
-                          if (!selection || !selection.blocks || selection.blocks.length === 0) {
-                            alert('Please select some text first');
-                            return;
-                          }
-                          const selectedText = selection.blocks.map((block: any) => block.content?.map((c: any) => c.text).join('')).join('\n');
-                          if (!selectedText) return;
-                          await callAI('professional', selectedText, selection.blocks[0].id, true);
-                        }}
-                        className="px-3 py-1.5 bg-white border border-purple-200 rounded-md text-xs font-medium text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-1.5"
-                      >
-                        <Briefcase className="w-3.5 h-3.5" />
-                        Professional
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const selection = editor.getSelection();
-                          if (!selection || !selection.blocks || selection.blocks.length === 0) {
-                            alert('Please select some text first');
-                            return;
-                          }
-                          const selectedText = selection.blocks.map((block: any) => block.content?.map((c: any) => c.text).join('')).join('\n');
-                          if (!selectedText) return;
-                          await callAI('simplify', selectedText, selection.blocks[0].id, true);
-                        }}
-                        className="px-3 py-1.5 bg-white border border-purple-200 rounded-md text-xs font-medium text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-1.5"
-                      >
-                        <Minimize className="w-3.5 h-3.5" />
-                        Simplify
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const selection = editor.getSelection();
-                          if (!selection || !selection.blocks || selection.blocks.length === 0) {
-                            alert('Please select some text first');
-                            return;
-                          }
-                          const selectedText = selection.blocks.map((block: any) => block.content?.map((c: any) => c.text).join('')).join('\n');
-                          if (!selectedText) return;
-                          await callAI('expand', selectedText, selection.blocks[0].id, true);
-                        }}
-                        className="px-3 py-1.5 bg-white border border-purple-200 rounded-md text-xs font-medium text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-1.5"
-                      >
-                        <Maximize className="w-3.5 h-3.5" />
-                        Expand
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* AI Suggestion Dialog */}
-          {aiSuggestion && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">AI Suggestion</h3>
-                  </div>
-                  <button
-                    onClick={rejectSuggestion}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Original
-                    </label>
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <p className="text-gray-800">{aiSuggestion.original}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      AI Suggestion
-                    </label>
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <p className="text-gray-800">{aiSuggestion.suggestion}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
-                  <button
-                    onClick={rejectSuggestion}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Reject
-                  </button>
-                  <button
-                    onClick={acceptSuggestion}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
-                  >
-                    <Check className="w-4 h-4" />
-                    Accept
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Loading Indicator */}
-          {isLoadingAI && (
-            <div className="fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm font-medium">AI is thinking...</span>
-            </div>
-          )}
-
           {/* Content - BlockNote Editor with Sidebar */}
           <div className="mt-8 flex gap-8">
             <div className="flex-1 min-w-0">
@@ -874,7 +704,17 @@ export default function PlaybookDetailPage() {
                 editor={editor}
                 editable={isEditing}
                 theme="light"
-              />
+                formattingToolbar={false}
+                slashMenu={false}
+              >
+                {isEditing && (
+                  <>
+                    <FormattingToolbarWithAI />
+                    <SuggestionMenuWithAI editor={editor} />
+                    <AIMenuController />
+                  </>
+                )}
+              </BlockNoteView>
             </div>
 
             {/* Right Sidebar */}
