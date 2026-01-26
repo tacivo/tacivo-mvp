@@ -94,14 +94,14 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
   const navigationItems = [
     { icon: HomeIcon, label: 'Home', href: '/platform' },
     { icon: RocketLaunchIcon, label: 'Get Started', href: '/platform/get-started' },
+    { icon: PlusIcon, label: 'Start New Session', href: '/interview' },
+    { icon: BookOpenIcon, label: 'Create Playbook', href: '/platform/playbooks' },
+    { icon: PencilSquareIcon, label: 'Update Playbook', href: '/platform/playbooks/update' },
   ]
 
   const privateItems = [
     { icon: ClockIcon, label: 'Started Sessions', href: '/platform/sessions/started' },
     { icon: CheckCircleIcon, label: 'Completed Sessions', href: '/platform/sessions/completed' },
-    { icon: PlusIcon, label: 'Start New', href: '/interview' },
-    { icon: BookOpenIcon, label: 'Create Playbook', href: '/platform/playbooks' },
-    { icon: PencilSquareIcon, label: 'Update Playbook', href: '/platform/playbooks/update' },
   ]
 
   const collectiveItems = [
@@ -185,7 +185,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
                 ) : (
                   <ChevronRightIcon className="w-3 h-3" />
                 )}
-                Private Database
+                Private Knowledge Base
               </button>
             )}
             {(sidebarCollapsed || privateExpanded) && (
@@ -221,7 +221,7 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
                 ) : (
                   <ChevronRightIcon className="w-3 h-3" />
                 )}
-                Shared
+                Shared Knowledge Base
               </button>
             )}
             {(sidebarCollapsed || collectiveExpanded) && (
