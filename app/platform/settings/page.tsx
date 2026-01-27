@@ -23,7 +23,7 @@ export default function SettingsHubPage() {
         .from('profiles')
         .select('is_admin')
         .eq('id', user.id)
-        .single()
+        .single() as { data: { is_admin: boolean } | null }
 
       setIsAdmin(profile?.is_admin || false)
       setIsLoading(false)
