@@ -14,7 +14,7 @@ type PlaybookWithProfile = Playbook & {
   }
 }
 
-export default function SharedPlaybooksPage() {
+export default function MyPlaybooksPage() {
   const router = useRouter()
   const [playbooks, setPlaybooks] = useState<PlaybookWithProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -36,14 +36,7 @@ export default function SharedPlaybooksPage() {
       // Store current user ID for permission checks
       setCurrentUserId(user.id)
 
-      // Get user's organization
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single() as { data: { organization_id: string | null } | null }
-
-      // Fetch only shared playbooks from the organization
+      // Fetch only the current user's playbooks (both private and shared)
       const { data, error } = await (supabase as any)
         .from('playbooks')
         .select(`
@@ -53,8 +46,7 @@ export default function SharedPlaybooksPage() {
             role
           )
         `)
-        .eq('is_shared', true)
-        .eq('organization_id', profile?.organization_id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -131,8 +123,7 @@ export default function SharedPlaybooksPage() {
     const searchLower = searchQuery.toLowerCase()
     return (
       playbook.title.toLowerCase().includes(searchLower) ||
-      playbook.type.toLowerCase().includes(searchLower) ||
-      playbook.profiles?.full_name?.toLowerCase().includes(searchLower)
+      playbook.type.toLowerCase().includes(searchLower)
     )
   })
 
@@ -157,9 +148,9 @@ export default function SharedPlaybooksPage() {
 
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Shared Playbooks</h1>
+        <h1 className="text-4xl font-semibold text-foreground mb-2">My Playbooks</h1>
         <p className="text-muted-foreground">
-          AI-synthesized guides that find patterns across experiences to create best practices
+          All playbooks you've created, including both private and shared ones
         </p>
       </div>
 
@@ -168,7 +159,7 @@ export default function SharedPlaybooksPage() {
         <div className="relative max-w-md">
           <input
             type="text"
-            placeholder="Search playbooks..."
+            placeholder="Search your playbooks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-4 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -241,15 +232,6 @@ export default function SharedPlaybooksPage() {
 
               {/* Metadata */}
               <div className="space-y-2 text-sm text-muted-foreground">
-                {playbook.profiles?.full_name && (
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">
-                      {playbook.profiles.full_name}
-                      {playbook.profiles.role && ` • ${playbook.profiles.role}`}
-                    </span>
-                  </div>
-                )}
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 flex-shrink-0" />
                   <span>{formatDate(playbook.created_at)}</span>
@@ -268,27 +250,25 @@ export default function SharedPlaybooksPage() {
                 </div>
               </div>
 
-              {/* Actions (only show for owner) */}
-              {playbook.user_id === currentUserId && (
-                <div className="mt-4 pt-4 border-t border-border flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleToggleShare(playbook)
-                    }}
-                    className="flex-1 px-3 py-2 text-sm border border-border rounded-lg hover:border-accent/50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    {playbook.is_shared ? 'Unshare' : 'Share'}
-                  </button>
-                  <button
-                    onClick={(e) => handleDelete(playbook, e)}
-                    className="px-3 py-2 text-sm border border-border rounded-lg hover:border-red-500 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+              {/* Actions */}
+              <div className="mt-4 pt-4 border-t border-border flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleToggleShare(playbook)
+                  }}
+                  className="flex-1 px-3 py-2 text-sm border border-border rounded-lg hover:border-accent/50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  {playbook.is_shared ? 'Unshare' : 'Share'}
+                </button>
+                <button
+                  onClick={(e) => handleDelete(playbook, e)}
+                  className="px-3 py-2 text-sm border border-border rounded-lg hover:border-red-500 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </motion.div>
           ))}
         </div>

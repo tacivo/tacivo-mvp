@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UserIcon, BriefcaseIcon, CalendarIcon } from '@heroicons/react/24/outline'
-import { LogOut, User, Building2, Mail, Save, X } from 'lucide-react'
+import { LogOut, User, Building2, Mail, Save, X, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Profile } from '@/types/database.types'
 
@@ -119,6 +119,15 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-12">
+      {/* Back Button */}
+      <button
+        onClick={() => router.push('/platform/settings')}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </button>
+
       <div className="mb-12">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">

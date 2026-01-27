@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { FileText, Calendar, User, Share2, Eye, Search } from 'lucide-react'
+import { FileText, Calendar, User, Share2, Eye, Search, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getSharedCompanyDocuments } from '@/lib/supabase/interviews'
 import { Profile } from '@/types/database.types'
@@ -91,9 +91,18 @@ export default function ExperiencesPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-8 py-12">
+      {/* Back Button */}
+      <button
+        onClick={() => router.push('/platform/experiences-hub')}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </button>
+
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Team Experiences</h1>
+        <h1 className="text-4xl font-semibold text-foreground mb-2">Shared Experiences</h1>
         <p className="text-muted-foreground">
           Collective knowledge and insights shared by your team
         </p>

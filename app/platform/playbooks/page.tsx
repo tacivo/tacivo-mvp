@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, FileCheck, Users, Building, Loader2 } from 'lucide-react'
+import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, FileCheck, Users, Building, Loader2, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getAccessibleDocuments } from '@/lib/supabase/interviews'
 import { getUserInterviews } from '@/lib/supabase/interviews'
@@ -289,6 +289,15 @@ export default function PlaybooksPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-8 py-12">
+      {/* Back Button */}
+      <button
+        onClick={() => router.push('/platform/playbooks-hub')}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </button>
+
       {/* Page Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-semibold text-foreground mb-2">Create Playbook</h1>

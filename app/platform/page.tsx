@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Plus, FileText, Clock, CheckCircle, Play, Eye, User, Users, BookOpen, Globe, Lock } from 'lucide-react'
+import { Plus, FileText, Clock, CheckCircle, Play, Eye, User, Users, BookOpen, Globe, Lock, Rocket } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { getUserStats, getUserInterviews, getUserDocuments, getSharedCompanyDocuments } from '@/lib/supabase/interviews'
 import { Profile, Interview, Document } from '@/types/database.types'
@@ -149,13 +149,22 @@ export default function PlatformHomePage() {
         transition={{ duration: 0.5 }}
       >
         {/* Page Header */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-semibold text-foreground mb-3">
-            Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Your knowledge workspace at {(profile as any)?.organization?.name || 'Tacivo'}
-          </p>
+        <div className="flex items-start justify-between mb-12">
+          <div>
+            <h1 className="text-4xl font-semibold text-foreground mb-3">
+              Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Your knowledge workspace at {(profile as any)?.organization?.name || 'Tacivo'}
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/platform/get-started')}
+            className="flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent rounded-lg font-medium hover:bg-accent/20 transition-colors"
+          >
+            <Rocket className="w-4 h-4" />
+            Get Started
+          </button>
         </div>
 
         <div className="grid grid-cols-3 gap-8">

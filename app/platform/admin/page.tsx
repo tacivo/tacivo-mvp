@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShieldCheckIcon, BuildingOfficeIcon, UsersIcon, ChartBarIcon } from '@heroicons/react/24/outline'
-import { Globe, Save, X, Plus, Rocket, Upload, Image as ImageIcon } from 'lucide-react'
+import { Globe, Save, X, Plus, Rocket, Upload, Image as ImageIcon, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Organization, Profile } from '@/types/database.types'
 
@@ -310,6 +310,15 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-8 py-12">
+      {/* Back Button */}
+      <button
+        onClick={() => router.push('/platform/settings')}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </button>
+
       <div className="mb-12">
         <div className="flex items-center gap-3 mb-4">
           <ShieldCheckIcon className="w-10 h-10 text-accent" />
