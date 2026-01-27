@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { FileText, Calendar, User, Search, Globe, Lock, Trash2, Eye, ArrowLeft } from 'lucide-react'
+import { LightBulbIcon } from '@heroicons/react/24/outline'
 import { supabase } from '@/lib/supabase/client'
 import { deleteDocumentWithRelated } from '@/lib/supabase/interviews'
 import { Profile } from '@/types/database.types'
@@ -116,7 +117,7 @@ export default function MyExperiencesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="max-w-4xl mx-auto px-8 py-12">
       {/* Back Button */}
       <button
         onClick={() => router.push('/platform/experiences-hub')}
@@ -128,7 +129,10 @@ export default function MyExperiencesPage() {
 
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">My Experiences</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <LightBulbIcon className="w-10 h-10 text-accent" />
+          <h1 className="text-4xl font-semibold text-foreground">My Experiences</h1>
+        </div>
         <p className="text-muted-foreground">
           Your captured knowledge, including both private and shared experiences
         </p>
@@ -173,7 +177,7 @@ export default function MyExperiencesPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredDocs.map((doc, index) => (
             <motion.div
               key={doc.id}
@@ -181,7 +185,7 @@ export default function MyExperiencesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
               onClick={() => router.push(`/platform/sessions/completed/${doc.id}`)}
-              className="bg-card rounded-lg border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
+              className="bg-card rounded-xl border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
             >
               {/* Document Icon and Badges */}
               <div className="flex items-start justify-between mb-4">

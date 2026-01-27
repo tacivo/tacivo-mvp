@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { FileText, Calendar, User, Share2, Eye, Search, ArrowLeft } from 'lucide-react'
+import { LightBulbIcon } from '@heroicons/react/24/outline'
 import { supabase } from '@/lib/supabase/client'
 import { getSharedCompanyDocuments } from '@/lib/supabase/interviews'
 import { Profile } from '@/types/database.types'
@@ -90,7 +91,7 @@ export default function ExperiencesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="max-w-4xl mx-auto px-8 py-12">
       {/* Back Button */}
       <button
         onClick={() => router.push('/platform/experiences-hub')}
@@ -102,7 +103,10 @@ export default function ExperiencesPage() {
 
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Shared Experiences</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <LightBulbIcon className="w-10 h-10 text-accent" />
+          <h1 className="text-4xl font-semibold text-foreground">Shared Experiences</h1>
+        </div>
         <p className="text-muted-foreground">
           Collective knowledge and insights shared by your team
         </p>
@@ -139,7 +143,7 @@ export default function ExperiencesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredDocs.map((doc, index) => (
             <motion.div
               key={doc.id}
@@ -147,7 +151,7 @@ export default function ExperiencesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
               onClick={() => router.push(`/platform/experiences/${doc.id}`)}
-              className="bg-card rounded-lg border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
+              className="bg-card rounded-xl border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
             >
               {/* Document Icon and Function Area */}
               <div className="flex items-start justify-between mb-4">

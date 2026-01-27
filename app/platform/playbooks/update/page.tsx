@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, Users, Loader2, ArrowLeft, Plus, Upload, File, X } from 'lucide-react'
+import { BookOpenIcon } from '@heroicons/react/24/outline'
 import { supabase } from '@/lib/supabase/client'
 import { getAccessibleDocuments } from '@/lib/supabase/interviews'
 import { Playbook } from '@/types/database.types'
@@ -377,10 +378,22 @@ export default function UpdatePlaybooksPage() {
   // Source selection view - choose between upload or existing playbook
   if (viewMode === 'select-source') {
     return (
-      <div className="max-w-7xl mx-auto px-8 py-12">
+      <div className="max-w-4xl mx-auto px-8 py-12">
+        {/* Back Button */}
+        <button
+          onClick={() => router.push('/platform/playbooks-hub')}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-semibold text-foreground mb-2">Update Playbook</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <BookOpenIcon className="w-10 h-10 text-accent" />
+            <h1 className="text-4xl font-semibold text-foreground">Update Playbook</h1>
+          </div>
           <p className="text-muted-foreground">
             Upload a local playbook or select an existing one to update with new experiences
           </p>
@@ -492,7 +505,7 @@ export default function UpdatePlaybooksPage() {
   // Playbook selection view - choose which existing playbook to update
   if (viewMode === 'playbook-selection') {
     return (
-      <div className="max-w-7xl mx-auto px-8 py-12">
+      <div className="max-w-4xl mx-auto px-8 py-12">
         {/* Page Header */}
         <div className="mb-8">
           <button
@@ -502,7 +515,10 @@ export default function UpdatePlaybooksPage() {
             <ArrowLeft className="w-4 h-4" />
             Back to options
           </button>
-          <h1 className="text-4xl font-semibold text-foreground mb-2">Select a Playbook</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <BookOpenIcon className="w-10 h-10 text-accent" />
+            <h1 className="text-4xl font-semibold text-foreground">Select a Playbook</h1>
+          </div>
           <p className="text-muted-foreground">
             Choose which playbook you want to update with new experiences
           </p>
@@ -516,7 +532,7 @@ export default function UpdatePlaybooksPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
-              className="bg-card rounded-lg border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
+              className="bg-card rounded-xl border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
               onClick={() => handleSelectPlaybook(playbook)}
             >
               <div className="flex items-start gap-4 mb-4">
@@ -562,7 +578,7 @@ export default function UpdatePlaybooksPage() {
   const newDocCount = selectedDocuments.size - existingDocCount
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-12">
+    <div className="max-w-4xl mx-auto px-8 py-12">
       {/* Page Header with Back Button */}
       <div className="mb-8">
         <button
@@ -714,7 +730,7 @@ export default function UpdatePlaybooksPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredDocuments.map((doc, index) => {
             const isExistingInPlaybook = selectedPlaybook?.document_ids?.includes(doc.id) || false
             return (
@@ -723,7 +739,7 @@ export default function UpdatePlaybooksPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
-                className={`bg-card rounded-lg border p-6 hover:shadow-md transition-all cursor-pointer group relative ${
+                className={`bg-card rounded-xl border p-6 hover:shadow-md transition-all cursor-pointer group relative ${
                   selectedDocuments.has(doc.id)
                     ? 'border-accent bg-accent/5'
                     : 'border-border hover:border-accent/40'

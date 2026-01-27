@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, Briefcase, Award, FileText, Calendar, X, Search, Users } from 'lucide-react'
+import { User, Briefcase, Award, FileText, Calendar, X, Search, Users, ArrowLeft } from 'lucide-react'
+import { UserGroupIcon } from '@heroicons/react/24/outline'
 import { supabase } from '@/lib/supabase/client'
 import { getOrganizationExperts, getExpertDocuments } from '@/lib/supabase/interviews'
 import { Profile } from '@/types/database.types'
@@ -101,10 +102,22 @@ export default function ExpertsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="max-w-4xl mx-auto px-8 py-12">
+      {/* Back Button */}
+      <button
+        onClick={() => router.push('/platform/expertise-hub')}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </button>
+
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Experts</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <UserGroupIcon className="w-10 h-10 text-accent" />
+          <h1 className="text-4xl font-semibold text-foreground">Experts</h1>
+        </div>
         <p className="text-muted-foreground">
           Subject matter experts within your organization
         </p>
@@ -141,7 +154,7 @@ export default function ExpertsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredExperts.map((expert, index) => (
             <motion.div
               key={expert.id}
@@ -149,7 +162,7 @@ export default function ExpertsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
               onClick={() => handleExpertClick(expert)}
-              className="bg-card rounded-lg border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
+              className="bg-card rounded-xl border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
             >
               {/* Expert Avatar */}
               <div className="flex items-start gap-4 mb-4">

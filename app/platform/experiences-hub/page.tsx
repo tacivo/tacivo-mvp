@@ -31,6 +31,9 @@ export default function ExperiencesHubPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-12">
+      {/* Spacer to match pages with back button */}
+      <div className="mb-6 h-6" />
+
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <LightBulbIcon className="w-10 h-10 text-accent" />

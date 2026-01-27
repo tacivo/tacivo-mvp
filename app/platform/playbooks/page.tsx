@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { FileText, Calendar, User, CheckCircle, BookOpenIcon as BookOpen, FileCheck, Users, Building, Loader2, ArrowLeft } from 'lucide-react'
+import { BookOpenIcon } from '@heroicons/react/24/outline'
 import { supabase } from '@/lib/supabase/client'
 import { getAccessibleDocuments } from '@/lib/supabase/interviews'
 import { getUserInterviews } from '@/lib/supabase/interviews'
@@ -288,7 +289,7 @@ export default function PlaybooksPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-12">
+    <div className="max-w-4xl mx-auto px-8 py-12">
       {/* Back Button */}
       <button
         onClick={() => router.push('/platform/playbooks-hub')}
@@ -300,7 +301,10 @@ export default function PlaybooksPage() {
 
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Create Playbook</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <BookOpenIcon className="w-10 h-10 text-accent" />
+          <h1 className="text-4xl font-semibold text-foreground">Create Playbook</h1>
+        </div>
         <p className="text-muted-foreground">
           Synthesize patterns and best practices from multiple experiences to create comprehensive guides
         </p>
@@ -441,14 +445,14 @@ export default function PlaybooksPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredDocuments.map((doc, index) => (
             <motion.div
               key={doc.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
-              className={`bg-card rounded-lg border p-6 hover:shadow-md transition-all cursor-pointer group ${
+              className={`bg-card rounded-xl border p-6 hover:shadow-md transition-all cursor-pointer group ${
                 selectedDocuments.has(doc.id)
                   ? 'border-accent bg-accent/5'
                   : 'border-border hover:border-accent/40'

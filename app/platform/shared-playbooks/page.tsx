@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpenIcon, Calendar, User, FileText, Globe, Lock, Trash2, Share2, ArrowLeft } from 'lucide-react'
+import { Calendar, User, FileText, Globe, Lock, Trash2, Share2, ArrowLeft } from 'lucide-react'
+import { BookOpenIcon } from '@heroicons/react/24/outline'
 import { supabase } from '@/lib/supabase/client'
 import { Playbook } from '@/types/database.types'
 
@@ -145,7 +146,7 @@ export default function SharedPlaybooksPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-12">
+    <div className="max-w-4xl mx-auto px-8 py-12">
       {/* Back Button */}
       <button
         onClick={() => router.push('/platform/playbooks-hub')}
@@ -157,7 +158,10 @@ export default function SharedPlaybooksPage() {
 
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-2">Shared Playbooks</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <BookOpenIcon className="w-10 h-10 text-accent" />
+          <h1 className="text-4xl font-semibold text-foreground">Shared Playbooks</h1>
+        </div>
         <p className="text-muted-foreground">
           AI-synthesized guides that find patterns across experiences to create best practices
         </p>
@@ -199,14 +203,14 @@ export default function SharedPlaybooksPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredPlaybooks.map((playbook, index) => (
             <motion.div
               key={playbook.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
-              className="bg-card rounded-lg border border-border p-6 hover:shadow-md transition-all cursor-pointer group"
+              className="bg-card rounded-xl border border-border p-6 hover:border-accent/40 hover:shadow-md transition-all cursor-pointer group"
               onClick={() => router.push(`/platform/shared-playbooks/${playbook.id}`)}
             >
               {/* Header */}

@@ -34,7 +34,7 @@ const helpSections = [
   {
     icon: PlusIcon,
     title: 'Start New Session',
-    description: 'Begin a new AI-powered interview session to capture your knowledge and expertise. The AI will guide you through a structured conversation to extract valuable insights.',
+    description: 'Begin a new AI-powered interview session to capture your knowledge. The AI will guide you through a conversation to extract valuable insights and produce structured documents (i.e. Experiences and Expertise).',
   },
   {
     icon: ClockIcon,
@@ -44,17 +44,17 @@ const helpSections = [
   {
     icon: LightBulbIcon,
     title: 'Experiences',
-    description: 'Access your personal experiences and team-shared knowledge. Experiences are the documented outputs from completed interview sessions.',
+    description: 'The documented knowledge about specific experiences. Structure your experiences and learn from the ones shared within your organization.',
   },
   {
     icon: AcademicCapIcon,
     title: 'Expertise',
-    description: 'Manage and explore expertise areas within your organization. Track your skills and discover what knowledge exists across your team.',
+    description: 'The documented knowledge about general processes. Track your expertise and discover what knowledge exists across your team.',
   },
   {
     icon: BookOpenIcon,
     title: 'Playbooks',
-    description: 'AI-synthesized guides that find patterns across multiple experiences to create comprehensive best practices and operational procedures.',
+    description: 'AI-synthesized guides that find patterns across multiple experiences and expertise to create comprehensive best practices and operational procedures.',
   },
   {
     icon: UserGroupIcon,
@@ -352,31 +352,28 @@ export default function PlatformLayout({ children }: PlatformLayoutProps) {
           </div>
         </nav>
 
-        {/* Sidebar Toggle Button */}
-        <div className="p-3 border-t border-border">
-          <button
-            onClick={toggleSidebar}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} w-full px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors`}
-          >
-            {sidebarCollapsed ? (
-              <ChevronDoubleRightIcon className="w-5 h-5" />
-            ) : (
-              <>
-                <ChevronDoubleLeftIcon className="w-5 h-5" />
-                <span>Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
-
         {/* Version Footer */}
         {!sidebarCollapsed && (
-          <div className="px-4 py-2 text-[10px] text-muted-foreground/60">
+          <div className="px-4 py-2 text-[10px] text-muted-foreground/60 border-t border-border">
             <p>Version 1.0.1</p>
             <p>© 2026 Tacivo. All rights reserved.</p>
           </div>
         )}
+
+        {/* Sidebar Toggle Button */}
+        <div className={`p-3 ${sidebarCollapsed ? 'border-t border-border' : ''}`}>
+          <button
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            {sidebarCollapsed ? (
+              <ChevronDoubleRightIcon className="w-5 h-5" />
+            ) : (
+              <ChevronDoubleLeftIcon className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Area */}
